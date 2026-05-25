@@ -6,13 +6,19 @@ export function hasNumberLayer(
   return puzzle.number !== undefined && puzzle.digit !== undefined
 }
 
-export function carNumberFromId(id: string): number {
-  return Number.parseInt(id.replace('car', ''), 10)
+/** Numeric suffix from `car3.png` in an image URL or puzzle id. */
+export function carNumberFromPath(pathOrId: string): number {
+  const match = /car(\d+)/i.exec(pathOrId)
+  return match ? Number.parseInt(match[1], 10) : Number.MAX_SAFE_INTEGER
 }
 
-/** Album swipe order: car1, car2, car3, … */
+/** Album swipe order: car1.png, car2.png, car3.png, … */
 export function compareAlbumOrder(a: Puzzle, b: Puzzle): number {
-  return carNumberFromId(a.id) - carNumberFromId(b.id)
+  const byImage = carNumberFromPath(a.car.image) - carNumberFromPath(b.car.image)
+  if (byImage !== 0) {
+    return byImage
+  }
+  return carNumberFromPath(a.id) - carNumberFromPath(b.id)
 }
 
 /** Final code order: 3, 4, 7, … */

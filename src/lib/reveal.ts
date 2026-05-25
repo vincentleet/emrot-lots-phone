@@ -6,9 +6,6 @@ export const FOUND_OPACITY_THRESHOLD = 0.9
 /** Visibility at the outer edge of the wide car zone (keeps dark photos from looking “off”). */
 const CAR_EDGE_OPACITY = 0.38
 
-/** Below this, show the tilt-phone placeholder instead of an empty black frame. */
-export const CAR_PLACEHOLDER_THRESHOLD = 0.2
-
 export interface DualRevealOpacities {
   car: number
   number: number
@@ -106,11 +103,4 @@ export function hintToleranceForDistance(
   }
 
   return numberTolerance
-}
-
-export function shouldShowTiltPlaceholder(
-  carOpacity: number,
-  slideLocked: boolean,
-): boolean {
-  return !slideLocked && carOpacity < CAR_PLACEHOLDER_THRESHOLD
 }
