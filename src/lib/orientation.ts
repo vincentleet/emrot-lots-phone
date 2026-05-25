@@ -148,7 +148,7 @@ export function computeTiltHints(
   return {
     top: betaCorrection < -MIN_HINT_DELTA_DEG ? hintIntensity(betaCorrection, tolerance) : 0,
     bottom: betaCorrection > MIN_HINT_DELTA_DEG ? hintIntensity(betaCorrection, tolerance) : 0,
-    right: gammaCorrection < -MIN_HINT_DELTA_DEG ? hintIntensity(gammaCorrection, tolerance) : 0,
-    left: gammaCorrection > MIN_HINT_DELTA_DEG ? hintIntensity(gammaCorrection, tolerance) : 0,
+    left: gammaCorrection < -MIN_HINT_DELTA_DEG ? hintIntensity(gammaCorrection, tolerance) : 0,
+    right: gammaCorrection > MIN_HINT_DELTA_DEG ? hintIntensity(gammaCorrection, tolerance) : 0,
   }
 }
