@@ -254,6 +254,70 @@ h1 {
   overflow: hidden;
 }
 
+.tilt-placeholder {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  color: rgba(255, 255, 255, 0.55);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.tilt-placeholder.is-visible {
+  opacity: 1;
+}
+
+.tilt-placeholder-icon {
+  width: 4.5rem;
+  height: 4.5rem;
+  animation: tilt-phone-wobble 2.2s ease-in-out infinite;
+}
+
+.tilt-placeholder-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.tilt-placeholder-motion {
+  animation: tilt-arrows-pulse 2.2s ease-in-out infinite;
+}
+
+.tilt-placeholder-label {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+@keyframes tilt-phone-wobble {
+  0%,
+  100% {
+    transform: rotate(-14deg);
+  }
+
+  50% {
+    transform: rotate(14deg);
+  }
+}
+
+@keyframes tilt-arrows-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
 .photos-image {
   position: absolute;
   inset: 0;
@@ -267,8 +331,12 @@ h1 {
   transition: opacity 0.08s linear;
 }
 
-.photos-image--number {
+.photos-image--car {
   z-index: 1;
+}
+
+.photos-image--number {
+  z-index: 2;
 }
 
 .photos-image--number.is-locked {
@@ -314,7 +382,7 @@ h1 {
 .tilt-hints {
   position: absolute;
   inset: 0;
-  z-index: 2;
+  z-index: 3;
   pointer-events: none;
 }
 

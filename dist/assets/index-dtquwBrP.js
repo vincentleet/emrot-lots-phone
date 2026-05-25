@@ -1,0 +1,97 @@
+(function(){let e=document.createElement(`link`).relList;if(e&&e.supports&&e.supports(`modulepreload`))return;for(let e of document.querySelectorAll(`link[rel="modulepreload"]`))n(e);new MutationObserver(e=>{for(let t of e)if(t.type===`childList`)for(let e of t.addedNodes)e.tagName===`LINK`&&e.rel===`modulepreload`&&n(e)}).observe(document,{childList:!0,subtree:!0});function t(e){let t={};return e.integrity&&(t.integrity=e.integrity),e.referrerPolicy&&(t.referrerPolicy=e.referrerPolicy),e.crossOrigin===`use-credentials`?t.credentials=`include`:e.crossOrigin===`anonymous`?t.credentials=`omit`:t.credentials=`same-origin`,t}function n(e){if(e.ep)return;e.ep=!0;let n=t(e);fetch(e.href,n)}})();function e(e){return`/emrot-lots-phone/${e.replace(/^\//,``)}`}function t(e){return e.number!==void 0&&e.digit!==void 0}function n(e){return Number.parseInt(e.replace(`car`,``),10)}function r(e,t){return n(e.id)-n(t.id)}function i(e,t){return Number(e.digit??0)-Number(t.digit??0)}var a=[{id:`car1`,target:{beta:48,gamma:0},car:{image:e(`assets/cars/car1.png`),tolerance:45}},{id:`car2`,target:{beta:48,gamma:0},car:{image:e(`assets/cars/car2.png`),tolerance:45}},{id:`car3`,digit:`3`,target:{beta:45,gamma:42},car:{image:e(`assets/cars/car3.png`),tolerance:45},number:{image:e(`assets/cars/car3-number.png`),tolerance:10}},{id:`car4`,digit:`4`,target:{beta:48,gamma:0},car:{image:e(`assets/cars/car4.png`),tolerance:45},number:{image:e(`assets/cars/car4-number.png`),tolerance:10}},{id:`car5`,target:{beta:48,gamma:0},car:{image:e(`assets/cars/car5.png`),tolerance:45}},{id:`car6`,target:{beta:48,gamma:0},car:{image:e(`assets/cars/car6.png`),tolerance:45}},{id:`car7`,digit:`7`,target:{beta:18,gamma:0},car:{image:e(`assets/cars/car7.png`),tolerance:45},number:{image:e(`assets/cars/car7-number.png`),tolerance:10}}].sort(r),o=class{listener=null;boundHandler=e=>{this.listener?.({beta:e.beta,gamma:e.gamma,alpha:e.alpha})};get isSecureContext(){return window.isSecureContext}async requestAccess(){let e=DeviceOrientationEvent;return typeof e.requestPermission==`function`&&await e.requestPermission()!==`granted`?!1:this.waitForFirstReading(3e3)}start(e){this.listener=e,window.addEventListener(`deviceorientation`,this.boundHandler)}stop(){window.removeEventListener(`deviceorientation`,this.boundHandler),this.listener=null}waitForFirstReading(e){return new Promise(t=>{let n=!1,r=e=>{e.beta===null&&e.gamma===null||n||(n=!0,window.removeEventListener(`deviceorientation`,r),clearTimeout(i),t(!0))},i=window.setTimeout(()=>{n||(n=!0,window.removeEventListener(`deviceorientation`,r),t(!1))},e);window.addEventListener(`deviceorientation`,r)})}};function s(e,t){if(e.beta===null||e.gamma===null)return null;let n=e.beta-t.beta,r=e.gamma-t.gamma;return Math.sqrt(n*n+r*r)}function c(e){return`beta: ${e.beta===null?`—`:e.beta.toFixed(1)}°  gamma: ${e.gamma===null?`—`:e.gamma.toFixed(1)}°`}function l(e){return`{ beta: ${e.beta}, gamma: ${e.gamma} }`}var u=2;function d(e,t){let n=Math.abs(e);return n<u?0:Math.min(1,Math.max(.35,n/t))}function f(e,t,n){let r={top:0,right:0,bottom:0,left:0};if(e.beta===null||e.gamma===null)return r;let i=t.beta-e.beta,a=t.gamma-e.gamma;return{top:i<-2?d(i,n):0,bottom:i>u?d(i,n):0,right:a<-2?d(a,n):0,left:a>u?d(a,n):0}}var p=.9,m=.38;function h(e,t){return e===null||e>t?0:1-e/t}function g(e){return e>=p}function _(e,t,n){if(e===null||e>t)return 0;if(n===void 0)return h(e,t);if(e<=n)return 1;let r=t-n;return r<=0?h(e,t):1-(e-n)/r*(1-m)}function v(e,t,n,r){let i=s(e,t);return{car:_(i,n,r),number:r===void 0?0:h(i,r),distance:i}}function y(e,t,n){return n===void 0||e===null||e>n*1.25?t:n}function b(e,t){return!t&&e<.2}async function x(){if(!(`wakeLock`in navigator))return null;try{return await navigator.wakeLock.request(`screen`)}catch{return null}}async function S(e){if(e)try{await e.release()}catch{}}function C(e,t,n){let{getIndex:r,setIndex:i,slideCount:a,onDrag:o}=n,s=0,c=!1,l=0,u=null,d=()=>{let n=e.clientWidth*.18,s=r();l<-n&&s<a-1?s+=1:l>n&&s>0&&--s,l=0,o?.(0),t.style.transition=`transform 0.32s cubic-bezier(0.22, 1, 0.36, 1)`,i(s)},f=n=>{n.button===0&&(c=!0,u=n.pointerId,s=n.clientX,l=0,t.style.transition=`none`,e.setPointerCapture(n.pointerId))},p=e=>{!c||e.pointerId!==u||(l=e.clientX-s,o?.(l))},m=t=>{!c||t.pointerId!==u||(c=!1,u=null,e.hasPointerCapture(t.pointerId)&&e.releasePointerCapture(t.pointerId),d())};return e.addEventListener(`pointerdown`,f),e.addEventListener(`pointermove`,p),e.addEventListener(`pointerup`,m),e.addEventListener(`pointercancel`,m),()=>{e.removeEventListener(`pointerdown`,f),e.removeEventListener(`pointermove`,p),e.removeEventListener(`pointerup`,m),e.removeEventListener(`pointercancel`,m)}}var w=5,T=2e3,E=class{root;orientation=new o;screen=`intro`;puzzleIndex=0;slideLocked=a.map(()=>!1);galleryContainer=null;galleryTrack=null;galleryDragPx=0;detachGallerySwipe=null;galleryResizeObserver=null;wakeLock=null;rafId=null;calibrationTapCount=0;calibrationTapTimer=null;returnScreen=`intro`;latestReading={beta:null,gamma:null,alpha:null};constructor(e){this.root=e,this.render()}allCodeSlidesLocked(){return a.every((e,n)=>!t(e)||this.slideLocked[n])}setScreen(e){this.stopGalleryLoop(),this.detachGallerySwipe?.(),this.detachGallerySwipe=null,this.galleryResizeObserver?.disconnect(),this.galleryResizeObserver=null,this.galleryContainer=null,this.galleryTrack=null,this.screen=e,this.render()}render(){switch(this.root.innerHTML=``,this.screen){case`intro`:this.renderIntro();break;case`gallery`:this.renderGallery();break;case`summary`:this.renderSummary();break;case`calibrate`:this.renderCalibrate();break}}renderIntro(){let e=this.createScreen(`intro-screen`);e.innerHTML=`
+      <div class="intro-content">
+        <div class="photos-app-icon" aria-hidden="true"></div>
+        <h1>Photos</h1>
+        <p class="lede">Allow motion access to view your library.</p>
+        ${this.orientation.isSecureContext?``:`<p class="warning">Open via HTTPS or the installed app — not as a local file.</p>`}
+        <button type="button" class="btn btn-photos" data-action="enable-sensors">
+          Continue
+        </button>
+        <p class="hint" data-sensor-status hidden></p>
+      </div>
+    `,e.querySelector(`[data-action="enable-sensors"]`)?.addEventListener(`click`,()=>{this.enableSensors(e)}),this.attachCalibrationTrigger(e),this.root.append(e)}async enableSensors(e){let t=e.querySelector(`[data-action="enable-sensors"]`),n=e.querySelector(`[data-sensor-status]`);if(t&&(t.disabled=!0,t.textContent=`Loading…`),!await this.orientation.requestAccess()){t&&(t.disabled=!1,t.textContent=`Continue`),n&&(n.hidden=!1,n.textContent=`Motion access unavailable. Install via HTTPS or the APK, then try again.`);return}this.orientation.start(e=>{this.latestReading=e}),this.puzzleIndex=0,this.slideLocked=a.map(()=>!1),this.setScreen(`gallery`),this.acquireWakeLock()}renderGallery(){let e=this.createScreen(`gallery-screen`),n=a.map((e,t)=>{let n=e.number?`<img
+                class="photos-image photos-image--number ${this.slideLocked[t]?`is-locked`:``}"
+                data-number-layer
+                src="${e.number.image}"
+                alt=""
+                draggable="false"
+              />`:``;return`
+          <article class="photos-slide" data-slide data-slide-index="${t}">
+            <div class="photo-stack">
+              <div class="tilt-placeholder is-visible" data-tilt-placeholder aria-hidden="true">
+                <div class="tilt-placeholder-icon">
+                  <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <rect x="18" y="6" width="28" height="52" rx="5" stroke="currentColor" stroke-width="2.5"/>
+                    <circle cx="32" cy="48" r="2.5" fill="currentColor"/>
+                    <path d="M26 14h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    <path class="tilt-placeholder-motion" d="M8 28l6-6 6 6M50 36l-6 6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </div>
+                <p class="tilt-placeholder-label">Tilt your phone</p>
+              </div>
+              <img
+                class="photos-image photos-image--car"
+                data-car-layer
+                src="${e.car.image}"
+                alt="Photo ${t+1}"
+                draggable="false"
+              />
+              ${n}
+            </div>
+            <div class="tilt-hints" aria-hidden="true">
+              <span class="tilt-hint tilt-hint--top" data-tilt-hint="top"></span>
+              <span class="tilt-hint tilt-hint--right" data-tilt-hint="right"></span>
+              <span class="tilt-hint tilt-hint--bottom" data-tilt-hint="bottom"></span>
+              <span class="tilt-hint tilt-hint--left" data-tilt-hint="left"></span>
+            </div>
+          </article>
+        `}).join(``),r=a.map((e,n)=>`<span class="photos-dot ${n===this.puzzleIndex?`is-active`:``} ${this.slideLocked[n]&&t(a[n])?`is-found`:``}" data-photo-dot="${n}"></span>`).join(``);e.innerHTML=`
+      <header class="photos-toolbar">
+        <button type="button" class="photos-toolbar-btn" data-action="albums" aria-label="Albums">
+          <span class="photos-toolbar-chevron" aria-hidden="true">‹</span>
+          <span>Albums</span>
+        </button>
+        <span class="photos-toolbar-title" data-photo-counter>${this.puzzleIndex+1} of ${a.length}</span>
+        <button
+          type="button"
+          class="photos-toolbar-btn photos-toolbar-btn--icon"
+          data-action="view-code"
+          aria-label="View recovered code"
+          ${this.allCodeSlidesLocked()?``:`hidden`}
+        >
+          <span aria-hidden="true">ⓘ</span>
+        </button>
+      </header>
+      <div class="photos-viewport" data-gallery-viewport>
+        <div class="photos-track" data-gallery-track>
+          ${n}
+        </div>
+      </div>
+      <footer class="photos-chrome">
+        <div class="photos-dots" data-photo-dots>${r}</div>
+      </footer>
+    `,this.galleryContainer=e,this.galleryTrack=e.querySelector(`[data-gallery-track]`);let i=e.querySelector(`[data-gallery-viewport]`);i&&this.galleryTrack&&(this.detachGallerySwipe=C(i,this.galleryTrack,{slideCount:a.length,getIndex:()=>this.puzzleIndex,setIndex:e=>this.goToSlide(e),onDrag:e=>{this.galleryDragPx=e,this.updateGalleryTransform(!1)}})),this.attachCalibrationTrigger(e),this.root.append(e),this.updateGalleryTransform(!1),this.startGalleryLoop(e),this.galleryResizeObserver=new ResizeObserver(()=>this.updateGalleryTransform(!1)),i&&this.galleryResizeObserver.observe(i)}goToSlide(e){this.puzzleIndex=e,this.galleryDragPx=0,this.updateGalleryChrome(),this.updateGalleryTransform(!0)}updateGalleryTransform(e){if(!this.galleryTrack)return;let t=this.galleryContainer?.querySelector(`[data-gallery-viewport]`)?.clientWidth??0;this.galleryTrack.style.transition=e?`transform 0.32s cubic-bezier(0.22, 1, 0.36, 1)`:`none`;let n=-this.puzzleIndex*t+this.galleryDragPx;this.galleryTrack.style.transform=`translate3d(${n}px, 0, 0)`}updateGalleryChrome(){if(!this.galleryContainer)return;let e=this.galleryContainer.querySelector(`[data-photo-counter]`);e&&(e.textContent=`${this.puzzleIndex+1} of ${a.length}`);let n=this.galleryContainer.querySelector(`[data-action="view-code"]`);n&&(n.hidden=!this.allCodeSlidesLocked()),this.galleryContainer.querySelectorAll(`[data-photo-dot]`).forEach((e,n)=>{e.classList.toggle(`is-active`,n===this.puzzleIndex),e.classList.toggle(`is-found`,this.slideLocked[n]&&t(a[n]))})}startGalleryLoop(e){let t=e.querySelectorAll(`[data-slide]`),n=()=>{t.forEach((e,t)=>{let n=a[t],r=e.querySelector(`[data-car-layer]`),i=e.querySelector(`[data-number-layer]`),o=e.querySelector(`[data-tilt-placeholder]`),s=e.querySelectorAll(`[data-tilt-hint]`),{car:c,number:l,distance:u}=v(this.latestReading,n.target,n.car.tolerance,n.number?.tolerance);r&&(r.style.opacity=String(c)),i&&(i.style.opacity=String(l)),o&&o.classList.toggle(`is-visible`,b(c,this.slideLocked[t]));let d=t===this.puzzleIndex;if(!this.slideLocked[t]&&d){let e=y(u,n.car.tolerance,n.number?.tolerance),t=f(this.latestReading,n.target,e);for(let e of s){let n=e.dataset.tiltHint,r=n?t[n]:0;e.style.opacity=String(r),e.classList.toggle(`is-active`,r>0)}}else if(d)for(let e of s)e.style.opacity=`0`,e.classList.remove(`is-active`);if(!this.slideLocked[t]&&n.number&&g(l)){this.slideLocked[t]=!0,i?.classList.add(`is-locked`),o?.classList.remove(`is-visible`),r&&(r.style.opacity=`1`),i&&(i.style.opacity=`1`);for(let e of s)e.style.opacity=`0`,e.classList.remove(`is-active`);this.updateGalleryChrome()}}),this.rafId=window.requestAnimationFrame(n)};this.rafId=window.requestAnimationFrame(n)}stopGalleryLoop(){this.rafId!==null&&(window.cancelAnimationFrame(this.rafId),this.rafId=null)}renderSummary(){this.releaseWakeLock();let e=this.createScreen(`summary-screen`);e.innerHTML=`
+      <div class="sheet-backdrop" data-action="close-summary"></div>
+      <div class="info-sheet" role="dialog" aria-labelledby="sheet-title">
+        <div class="info-sheet-handle" aria-hidden="true"></div>
+        <h2 id="sheet-title" class="info-sheet-title">Photo information</h2>
+        <p class="info-sheet-label">Recovered code</p>
+        <p class="code-display">${a.filter(t).sort(i).map(e=>e.digit).join(`-`)}</p>
+        <button type="button" class="btn btn-photos" data-action="close-summary">Done</button>
+      </div>
+    `,this.attachCalibrationTrigger(e),this.root.append(e)}renderCalibrate(){let e=this.createScreen(`calibrate-screen`);e.innerHTML=`
+      <div class="calibrate-content">
+        <p class="eyebrow">Staff mode</p>
+        <h1>Calibration</h1>
+        <p class="live-readout" data-live-readout>${c(this.latestReading)}</p>
+        <p class="calibrate-photo-label">Photo ${this.puzzleIndex+1} of ${a.length}</p>
+        <button type="button" class="btn btn-photos" data-action="copy-target">
+          Set as target
+        </button>
+        <p class="hint" data-copy-status hidden></p>
+        <button type="button" class="btn btn-secondary" data-action="exit-calibrate">
+          Back
+        </button>
+      </div>
+    `;let t=()=>{let n=e.querySelector(`[data-live-readout]`);n&&(n.textContent=c(this.latestReading)),this.screen===`calibrate`&&window.requestAnimationFrame(t)};window.requestAnimationFrame(t),e.querySelector(`[data-action="copy-target"]`)?.addEventListener(`click`,()=>{this.copyCurrentTarget(e)}),e.querySelector(`[data-action="exit-calibrate"]`)?.addEventListener(`click`,()=>{let e=this.returnScreen;this.setScreen(e===`summary`?`gallery`:e),e===`gallery`&&this.acquireWakeLock()}),this.root.append(e)}async copyCurrentTarget(e){let t=e.querySelector(`[data-copy-status]`);if(this.latestReading.beta===null||this.latestReading.gamma===null){t&&(t.hidden=!1,t.textContent=`Waiting for sensor data…`);return}let n={beta:Math.round(this.latestReading.beta),gamma:Math.round(this.latestReading.gamma)},r=a[this.puzzleIndex],i=[`target: ${l(n)},`,`car: { tolerance: ${r.car.tolerance} },`];r.number&&i.push(`number: { tolerance: ${r.number.tolerance} },`);let o=i.join(`
+  `);try{await navigator.clipboard.writeText(o),t&&(t.hidden=!1,t.textContent=`Copied target for photo ${this.puzzleIndex+1} — paste into puzzles.ts`)}catch{t&&(t.hidden=!1,t.textContent=o)}}attachCalibrationTrigger(e){let t=document.createElement(`button`);t.type=`button`,t.className=`calibration-trigger`,t.setAttribute(`aria-label`,`Staff calibration trigger`),t.addEventListener(`click`,()=>{this.calibrationTapCount+=1,this.calibrationTapTimer!==null&&window.clearTimeout(this.calibrationTapTimer),this.calibrationTapTimer=window.setTimeout(()=>{this.calibrationTapCount=0},T),this.calibrationTapCount>=w&&(this.calibrationTapCount=0,this.stopGalleryLoop(),this.releaseWakeLock(),this.returnScreen=this.screen===`gallery`?`gallery`:this.screen,this.setScreen(`calibrate`))}),e.append(t)}createScreen(e){let t=document.createElement(`section`);return t.className=`screen ${e}`,t}async acquireWakeLock(){this.wakeLock=await x()}async releaseWakeLock(){await S(this.wakeLock),this.wakeLock=null}bindNavigation(){this.root.addEventListener(`click`,e=>{let t=e.target;if(!(t instanceof HTMLElement))return;let n=t.closest(`[data-action]`)?.dataset.action;n===`view-code`&&this.setScreen(`summary`),n===`close-summary`&&(this.setScreen(`gallery`),this.acquireWakeLock())})}},D=`modulepreload`,O=function(e){return`/emrot-lots-phone/`+e},k={},A=function(e,t,n){let r=Promise.resolve();if(t&&t.length>0){let e=document.getElementsByTagName(`link`),i=document.querySelector(`meta[property=csp-nonce]`),a=i?.nonce||i?.getAttribute(`nonce`);function o(e){return Promise.all(e.map(e=>Promise.resolve(e).then(e=>({status:`fulfilled`,value:e}),e=>({status:`rejected`,reason:e}))))}r=o(t.map(t=>{if(t=O(t,n),t in k)return;k[t]=!0;let r=t.endsWith(`.css`),i=r?`[rel="stylesheet"]`:``;if(n)for(let n=e.length-1;n>=0;n--){let i=e[n];if(i.href===t&&(!r||i.rel===`stylesheet`))return}else if(document.querySelector(`link[href="${t}"]${i}`))return;let o=document.createElement(`link`);if(o.rel=r?`stylesheet`:D,r||(o.as=`script`),o.crossOrigin=``,o.href=t,a&&o.setAttribute(`nonce`,a),document.head.appendChild(o),r)return new Promise((e,n)=>{o.addEventListener(`load`,e),o.addEventListener(`error`,()=>n(Error(`Unable to preload CSS for ${t}`)))})}))}function i(e){let t=new Event(`vite:preloadError`,{cancelable:!0});if(t.payload=e,window.dispatchEvent(t),!t.defaultPrevented)throw e}return r.then(t=>{for(let e of t||[])e.status===`rejected`&&i(e.reason);return e().catch(i)})},j=`true`,M=`false`,N=j===`true`,P=M===`true`;function F(e={}){let{immediate:t=!1,onNeedReload:n,onNeedRefresh:r,onOfflineReady:i,onRegistered:a,onRegisteredSW:o,onRegisterError:s}=e,c,l,u,d=async(e=!0)=>{await l,N||u?.()};async function f(){if(`serviceWorker`in navigator){if(c=await A(async()=>{let{Workbox:e}=await import(`./workbox-window.prod.es5-Bd17z0YL.js`);return{Workbox:e}},[]).then(({Workbox:e})=>new e(`/emrot-lots-phone/sw.js`,{scope:`/emrot-lots-phone/`,type:`classic`})).catch(e=>{s?.(e)}),!c)return;if(u=()=>{c?.messageSkipWaiting()},!P)if(N)c.addEventListener(`activated`,e=>{(e.isUpdate||e.isExternal)&&(n?n():window.location.reload())}),c.addEventListener(`installed`,e=>{e.isUpdate||i?.()});else{let e=!1,t=()=>{e=!0,c?.addEventListener(`controlling`,e=>{e.isUpdate&&(n?n():window.location.reload())}),r?.()};c.addEventListener(`installed`,n=>{n.isUpdate===void 0?n.isExternal===void 0?!e&&i?.():n.isExternal?t():!e&&i?.():n.isUpdate||i?.()}),c.addEventListener(`waiting`,t)}c.register({immediate:t}).then(e=>{o?o(`/emrot-lots-phone/sw.js`,e):a?.(e)}).catch(e=>{s?.(e)})}}return l=f(),d}var I=document.querySelector(`#app`);if(!I)throw Error(`App root element not found`);new E(I).bindNavigation(),F({immediate:!0,onOfflineReady(){console.info(`Spy Phone is ready to work offline.`)}}),L();async function L(){try{await screen.orientation?.lock?.(`portrait`)}catch{}}

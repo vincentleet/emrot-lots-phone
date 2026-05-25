@@ -11,6 +11,7 @@ import {
   computeDualRevealOpacity,
   hintToleranceForDistance,
   isDigitFound,
+  shouldShowTiltPlaceholder,
 } from '../lib/reveal'
 import { releaseWakeLock, requestWakeLock } from '../lib/wakeLock'
 import { attachGallerySwipe } from './gallery'
@@ -158,6 +159,17 @@ export class App {
         return `
           <article class="photos-slide" data-slide data-slide-index="${index}">
             <div class="photo-stack">
+              <div class="tilt-placeholder is-visible" data-tilt-placeholder aria-hidden="true">
+                <div class="tilt-placeholder-icon">
+                  <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <rect x="18" y="6" width="28" height="52" rx="5" stroke="currentColor" stroke-width="2.5"/>
+                    <circle cx="32" cy="48" r="2.5" fill="currentColor"/>
+                    <path d="M26 14h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    <path class="tilt-placeholder-motion" d="M8 28l6-6 6 6M50 36l-6 6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </div>
+                <p class="tilt-placeholder-label">Tilt your phone</p>
+              </div>
               <img
                 class="photos-image photos-image--car"
                 data-car-layer
@@ -291,6 +303,7 @@ export class App {
         const puzzle = puzzles[index]
         const carLayer = slide.querySelector('[data-car-layer]') as HTMLElement | null
         const numberLayer = slide.querySelector('[data-number-layer]') as HTMLElement | null
+        const placeholder = slide.querySelector('[data-tilt-placeholder]') as HTMLElement | null
         const hintElements = slide.querySelectorAll<HTMLElement>('[data-tilt-hint]')
         const { car, number, distance } = computeDualRevealOpacity(
           this.latestReading,
@@ -304,6 +317,12 @@ export class App {
         }
         if (numberLayer) {
           numberLayer.style.opacity = String(number)
+        }
+        if (placeholder) {
+          placeholder.classList.toggle(
+            'is-visible',
+            shouldShowTiltPlaceholder(car, this.slideLocked[index]),
+          )
         }
 
         const isActive = index === this.puzzleIndex
@@ -331,6 +350,7 @@ export class App {
         if (!this.slideLocked[index] && puzzle.number && isDigitFound(number)) {
           this.slideLocked[index] = true
           numberLayer?.classList.add('is-locked')
+          placeholder?.classList.remove('is-visible')
           if (carLayer) {
             carLayer.style.opacity = '1'
           }
