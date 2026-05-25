@@ -1,6 +1,6 @@
 import { puzzles } from '../config/puzzles'
 import type { OrientationReading } from '../config/types'
-import { hasNumberLayer } from '../lib/puzzle'
+import { compareDigitOrder, hasNumberLayer } from '../lib/puzzle'
 import {
   computeTiltHints,
   formatOrientation,
@@ -364,6 +364,7 @@ export class App {
     const container = this.createScreen('summary-screen')
     const code = puzzles
       .filter(hasNumberLayer)
+      .sort(compareDigitOrder)
       .map((puzzle) => puzzle.digit)
       .join('-')
 

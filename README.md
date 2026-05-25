@@ -18,9 +18,9 @@ Each puzzle uses **two PNGs** in [`public/assets/cars/`](public/assets/cars/):
 | File | Purpose |
 |------|---------|
 | `car1.png` | Full car photo (reveals with a **wide** tilt tolerance) |
-| `car1-number.png` | Same dimensions, **transparent** PNG with the digit artwork baked in (reveals with a **narrow** tolerance) |
+| `car4-number.png` | Same dimensions as its car, **transparent** PNG with the digit baked in (reveals with a **narrow** tolerance) |
 
-Repeat for each photo that hides a code digit (`car3.png` + `car3-number.png`, etc.).
+Match the number file to the car (`car3.png` + `car3-number.png`). The album shows photos in **car number order** (1, 2, 3…). The final code uses **digit order** (3, 4, 7…).
 
 **Decoy photos** (car only, no hidden number): add just `car6.png` and omit the `number` block in config — they still appear in the swipe carousel with tilt arrows and a wide reveal zone.
 
@@ -38,6 +38,8 @@ The number layer only becomes clear when you're inside the smaller tolerance zon
 ## Calibrating tilt angles (staff mode)
 
 Tap the **top-left corner 5 times** within 2 seconds to open calibration mode. Hold the phone at the angle where the number should appear, then tap **Set as target** to copy the `target` (and tolerances) into `puzzles.ts`.
+
+Tilt arrows point the way to **lean** the phone (up arrow = tip the top toward the ceiling). After changing targets, recalibrate on a real device — browsers report `beta` / `gamma` slightly differently.
 
 ## Path A — PWA install (brief internet once)
 

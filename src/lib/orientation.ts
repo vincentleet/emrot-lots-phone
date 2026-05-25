@@ -115,7 +115,10 @@ function hintIntensity(delta: number, tolerance: number): number {
   return Math.min(1, Math.max(0.35, magnitude / tolerance))
 }
 
-/** Edge arrows: which way to tilt (beta = top/bottom, gamma = left/right). */
+/**
+ * Edge arrows show which way to lean the phone (not the correction vector).
+ * Up arrow → tilt the top of the phone toward the top of the screen / ceiling.
+ */
 export function computeTiltHints(
   reading: OrientationReading,
   target: OrientationTarget,
@@ -131,9 +134,9 @@ export function computeTiltHints(
   const gammaCorrection = target.gamma - reading.gamma
 
   return {
-    top: betaCorrection > MIN_HINT_DELTA_DEG ? hintIntensity(betaCorrection, tolerance) : 0,
-    bottom: betaCorrection < -MIN_HINT_DELTA_DEG ? hintIntensity(betaCorrection, tolerance) : 0,
-    right: gammaCorrection > MIN_HINT_DELTA_DEG ? hintIntensity(gammaCorrection, tolerance) : 0,
-    left: gammaCorrection < -MIN_HINT_DELTA_DEG ? hintIntensity(gammaCorrection, tolerance) : 0,
+    top: betaCorrection < -MIN_HINT_DELTA_DEG ? hintIntensity(betaCorrection, tolerance) : 0,
+    bottom: betaCorrection > MIN_HINT_DELTA_DEG ? hintIntensity(betaCorrection, tolerance) : 0,
+    right: gammaCorrection < -MIN_HINT_DELTA_DEG ? hintIntensity(gammaCorrection, tolerance) : 0,
+    left: gammaCorrection > MIN_HINT_DELTA_DEG ? hintIntensity(gammaCorrection, tolerance) : 0,
   }
 }

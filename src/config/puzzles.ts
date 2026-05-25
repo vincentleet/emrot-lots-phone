@@ -1,32 +1,28 @@
 import { assetUrl } from '../lib/assets'
+import { compareAlbumOrder } from '../lib/puzzle'
 import type { Puzzle } from './types'
 
-export const puzzles: Puzzle[] = [
+const puzzleDefs: Puzzle[] = [
   {
     id: 'car1',
-    digit: '4',
-    target: { beta: 45, gamma: -20 },
+    target: { beta: 42, gamma: -18 },
     car: {
       image: assetUrl('assets/cars/car1.png'),
       tolerance: 32,
     },
-    number: {
-      image: assetUrl('assets/cars/car1-number.png'),
-      tolerance: 8,
-    },
   },
   {
-    id: 'car6',
-    target: { beta: 30, gamma: 25 },
+    id: 'car2',
+    target: { beta: 36, gamma: 12 },
     car: {
-      image: assetUrl('assets/cars/car6.png'),
+      image: assetUrl('assets/cars/car2.png'),
       tolerance: 32,
     },
   },
   {
     id: 'car3',
-    digit: '2',
-    target: { beta: 60, gamma: -10 },
+    digit: '3',
+    target: { beta: 48, gamma: 58 },
     car: {
       image: assetUrl('assets/cars/car3.png'),
       tolerance: 32,
@@ -37,9 +33,38 @@ export const puzzles: Puzzle[] = [
     },
   },
   {
+    id: 'car4',
+    digit: '4',
+    target: { beta: 42, gamma: -18 },
+    car: {
+      image: assetUrl('assets/cars/car4.png'),
+      tolerance: 32,
+    },
+    number: {
+      image: assetUrl('assets/cars/car4-number.png'),
+      tolerance: 8,
+    },
+  },
+  {
+    id: 'car5',
+    target: { beta: 34, gamma: -8 },
+    car: {
+      image: assetUrl('assets/cars/car5.png'),
+      tolerance: 32,
+    },
+  },
+  {
+    id: 'car6',
+    target: { beta: 38, gamma: 22 },
+    car: {
+      image: assetUrl('assets/cars/car6.png'),
+      tolerance: 32,
+    },
+  },
+  {
     id: 'car7',
-    digit: '9',
-    target: { beta: 20, gamma: -35 },
+    digit: '7',
+    target: { beta: 8, gamma: 2 },
     car: {
       image: assetUrl('assets/cars/car7.png'),
       tolerance: 32,
@@ -50,3 +75,6 @@ export const puzzles: Puzzle[] = [
     },
   },
 ]
+
+/** Sorted car1 → car7 for the photo album carousel. */
+export const puzzles: Puzzle[] = [...puzzleDefs].sort(compareAlbumOrder)
