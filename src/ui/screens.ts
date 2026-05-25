@@ -1,6 +1,7 @@
 import { puzzles } from '../config/puzzles'
 import type { OrientationReading, Puzzle } from '../config/types'
 import {
+  computeTiltHints,
   formatOrientation,
   formatTarget,
   OrientationManager,
@@ -142,6 +143,12 @@ export class App {
         >
           ${puzzle.digit}
         </div>
+        <div class="tilt-hints" data-tilt-hints aria-hidden="true">
+          <span class="tilt-hint tilt-hint--top" data-tilt-hint="top"></span>
+          <span class="tilt-hint tilt-hint--right" data-tilt-hint="right"></span>
+          <span class="tilt-hint tilt-hint--bottom" data-tilt-hint="bottom"></span>
+          <span class="tilt-hint tilt-hint--left" data-tilt-hint="left"></span>
+        </div>
         <div class="locked-banner" data-locked-banner hidden>Number locked</div>
       </div>
       <div class="puzzle-footer">
@@ -164,6 +171,7 @@ export class App {
     const overlay = container.querySelector('[data-digit-overlay]') as HTMLElement | null
     const nextButton = container.querySelector('[data-action="next"]') as HTMLButtonElement | null
     const lockedBanner = container.querySelector('[data-locked-banner]') as HTMLElement | null
+    const hintElements = container.querySelectorAll<HTMLElement>('[data-tilt-hint]')
     const puzzle = this.currentPuzzle
 
     const tick = () => {
@@ -174,9 +182,23 @@ export class App {
         overlay.style.opacity = String(opacity)
       }
 
+      if (!this.puzzleLocked) {
+        const hints = computeTiltHints(this.latestReading, puzzle.target, puzzle.tolerance)
+        for (const element of hintElements) {
+          const side = element.dataset.tiltHint as keyof typeof hints | undefined
+          const strength = side ? hints[side] : 0
+          element.style.opacity = String(strength)
+          element.classList.toggle('is-active', strength > 0)
+        }
+      }
+
       if (!this.puzzleLocked && isDigitFound(opacity)) {
         this.puzzleLocked = true
         overlay?.classList.add('is-locked')
+        for (const element of hintElements) {
+          element.style.opacity = '0'
+          element.classList.remove('is-active')
+        }
         if (lockedBanner) {
           lockedBanner.hidden = false
         }

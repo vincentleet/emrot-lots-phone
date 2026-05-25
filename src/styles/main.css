@@ -173,6 +173,88 @@ h1 {
   color: #fde047;
 }
 
+.tilt-hints {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.tilt-hint {
+  position: absolute;
+  width: 2.25rem;
+  height: 2.25rem;
+  opacity: 0;
+  transition: opacity 0.12s linear;
+}
+
+.tilt-hint::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 0.85rem;
+  height: 0.85rem;
+  border-top: 3px solid rgba(125, 211, 252, 0.95);
+  border-right: 3px solid rgba(125, 211, 252, 0.95);
+  border-radius: 1px;
+  filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.55));
+}
+
+.tilt-hint.is-active::after {
+  animation: tilt-hint-pulse 1.1s ease-in-out infinite;
+}
+
+.tilt-hint--top {
+  top: 0.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.tilt-hint--top::after {
+  transform: rotate(-45deg);
+}
+
+.tilt-hint--right {
+  top: 50%;
+  right: 0.5rem;
+  transform: translateY(-50%);
+}
+
+.tilt-hint--right::after {
+  transform: rotate(45deg);
+}
+
+.tilt-hint--bottom {
+  bottom: 0.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.tilt-hint--bottom::after {
+  transform: rotate(135deg);
+}
+
+.tilt-hint--left {
+  top: 50%;
+  left: 0.5rem;
+  transform: translateY(-50%);
+}
+
+.tilt-hint--left::after {
+  transform: rotate(-135deg);
+}
+
+@keyframes tilt-hint-pulse {
+  0%,
+  100% {
+    opacity: 0.75;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
 .locked-banner {
   position: absolute;
   left: 50%;
