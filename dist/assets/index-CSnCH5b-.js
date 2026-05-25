@@ -1,0 +1,82 @@
+(function(){let e=document.createElement(`link`).relList;if(e&&e.supports&&e.supports(`modulepreload`))return;for(let e of document.querySelectorAll(`link[rel="modulepreload"]`))n(e);new MutationObserver(e=>{for(let t of e)if(t.type===`childList`)for(let e of t.addedNodes)e.tagName===`LINK`&&e.rel===`modulepreload`&&n(e)}).observe(document,{childList:!0,subtree:!0});function t(e){let t={};return e.integrity&&(t.integrity=e.integrity),e.referrerPolicy&&(t.referrerPolicy=e.referrerPolicy),e.crossOrigin===`use-credentials`?t.credentials=`include`:e.crossOrigin===`anonymous`?t.credentials=`omit`:t.credentials=`same-origin`,t}function n(e){if(e.ep)return;e.ep=!0;let n=t(e);fetch(e.href,n)}})();function e(e){return`/emrot-lots-phone/${e.replace(/^\//,``)}`}var t=[{id:`car1`,image:e(`assets/cars/car1.png`),digit:`4`,target:{beta:45,gamma:-20},tolerance:12,overlay:{top:`42%`,left:`58%`}},{id:`car6`,image:e(`assets/cars/car6.png`),digit:`7`,target:{beta:30,gamma:25},tolerance:12,overlay:{top:`38%`,left:`35%`}},{id:`car3`,image:e(`assets/cars/car3.png`),digit:`2`,target:{beta:60,gamma:-10},tolerance:12,overlay:{top:`55%`,left:`50%`}},{id:`car7`,image:e(`assets/cars/car7.png`),digit:`9`,target:{beta:20,gamma:-35},tolerance:12,overlay:{top:`45%`,left:`62%`}}],n=class{listener=null;boundHandler=e=>{this.listener?.({beta:e.beta,gamma:e.gamma,alpha:e.alpha})};get isSecureContext(){return window.isSecureContext}async requestAccess(){let e=DeviceOrientationEvent;return typeof e.requestPermission==`function`&&await e.requestPermission()!==`granted`?!1:this.waitForFirstReading(3e3)}start(e){this.listener=e,window.addEventListener(`deviceorientation`,this.boundHandler)}stop(){window.removeEventListener(`deviceorientation`,this.boundHandler),this.listener=null}waitForFirstReading(e){return new Promise(t=>{let n=!1,r=e=>{e.beta===null&&e.gamma===null||n||(n=!0,window.removeEventListener(`deviceorientation`,r),clearTimeout(i),t(!0))},i=window.setTimeout(()=>{n||(n=!0,window.removeEventListener(`deviceorientation`,r),t(!1))},e);window.addEventListener(`deviceorientation`,r)})}};function r(e,t){if(e.beta===null||e.gamma===null)return null;let n=e.beta-t.beta,r=e.gamma-t.gamma;return Math.sqrt(n*n+r*r)}function i(e){return`beta: ${e.beta===null?`—`:e.beta.toFixed(1)}°  gamma: ${e.gamma===null?`—`:e.gamma.toFixed(1)}°`}function a(e){return`{ beta: ${e.beta}, gamma: ${e.gamma} }`}var o=2;function s(e,t){let n=Math.abs(e);return n<o?0:Math.min(1,Math.max(.35,n/t))}function c(e,t,n){let r={top:0,right:0,bottom:0,left:0};if(e.beta===null||e.gamma===null)return r;let i=t.beta-e.beta,a=t.gamma-e.gamma;return{top:i>o?s(i,n):0,bottom:i<-2?s(i,n):0,right:a>o?s(a,n):0,left:a<-2?s(a,n):0}}var l=.9;function u(e,t){return e===null||e>t?0:1-e/t}function d(e){return e>=l}function f(e,t,n){return u(r(e,t),n)}async function p(){if(!(`wakeLock`in navigator))return null;try{return await navigator.wakeLock.request(`screen`)}catch{return null}}async function m(e){if(e)try{await e.release()}catch{}}function h(e,t,n){let{getIndex:r,setIndex:i,slideCount:a,onDrag:o}=n,s=0,c=!1,l=0,u=null,d=()=>{let n=e.clientWidth*.18,s=r();l<-n&&s<a-1?s+=1:l>n&&s>0&&--s,l=0,o?.(0),t.style.transition=`transform 0.32s cubic-bezier(0.22, 1, 0.36, 1)`,i(s)},f=n=>{n.button===0&&(c=!0,u=n.pointerId,s=n.clientX,l=0,t.style.transition=`none`,e.setPointerCapture(n.pointerId))},p=e=>{!c||e.pointerId!==u||(l=e.clientX-s,o?.(l))},m=t=>{!c||t.pointerId!==u||(c=!1,u=null,e.hasPointerCapture(t.pointerId)&&e.releasePointerCapture(t.pointerId),d())};return e.addEventListener(`pointerdown`,f),e.addEventListener(`pointermove`,p),e.addEventListener(`pointerup`,m),e.addEventListener(`pointercancel`,m),()=>{e.removeEventListener(`pointerdown`,f),e.removeEventListener(`pointermove`,p),e.removeEventListener(`pointerup`,m),e.removeEventListener(`pointercancel`,m)}}var g=5,_=2e3,v=class{root;orientation=new n;screen=`intro`;puzzleIndex=0;slideLocked=t.map(()=>!1);galleryContainer=null;galleryTrack=null;galleryDragPx=0;detachGallerySwipe=null;wakeLock=null;rafId=null;calibrationTapCount=0;calibrationTapTimer=null;returnScreen=`intro`;latestReading={beta:null,gamma:null,alpha:null};constructor(e){this.root=e,this.render()}allSlidesLocked(){return this.slideLocked.every(Boolean)}setScreen(e){this.stopGalleryLoop(),this.detachGallerySwipe?.(),this.detachGallerySwipe=null,this.galleryContainer=null,this.galleryTrack=null,this.screen=e,this.render()}render(){switch(this.root.innerHTML=``,this.screen){case`intro`:this.renderIntro();break;case`gallery`:this.renderGallery();break;case`summary`:this.renderSummary();break;case`calibrate`:this.renderCalibrate();break}}renderIntro(){let e=this.createScreen(`intro-screen`);e.innerHTML=`
+      <div class="intro-content">
+        <div class="photos-app-icon" aria-hidden="true"></div>
+        <h1>Photos</h1>
+        <p class="lede">Allow motion access to view your library.</p>
+        ${this.orientation.isSecureContext?``:`<p class="warning">Open via HTTPS or the installed app — not as a local file.</p>`}
+        <button type="button" class="btn btn-photos" data-action="enable-sensors">
+          Continue
+        </button>
+        <p class="hint" data-sensor-status hidden></p>
+      </div>
+    `,e.querySelector(`[data-action="enable-sensors"]`)?.addEventListener(`click`,()=>{this.enableSensors(e)}),this.attachCalibrationTrigger(e),this.root.append(e)}async enableSensors(e){let n=e.querySelector(`[data-action="enable-sensors"]`),r=e.querySelector(`[data-sensor-status]`);if(n&&(n.disabled=!0,n.textContent=`Loading…`),!await this.orientation.requestAccess()){n&&(n.disabled=!1,n.textContent=`Continue`),r&&(r.hidden=!1,r.textContent=`Motion access unavailable. Install via HTTPS or the APK, then try again.`);return}this.orientation.start(e=>{this.latestReading=e}),this.puzzleIndex=0,this.slideLocked=t.map(()=>!1),this.setScreen(`gallery`),this.acquireWakeLock()}renderGallery(){let e=this.createScreen(`gallery-screen`),n=t.map((e,t)=>{let n=e.overlay??{top:`45%`,left:`50%`};return`
+          <article class="photos-slide" data-slide data-slide-index="${t}">
+            <img
+              class="photos-image"
+              src="${e.image}"
+              alt="Photo ${t+1}"
+              draggable="false"
+            />
+            <div
+              class="digit-overlay ${this.slideLocked[t]?`is-locked`:``}"
+              data-digit-overlay
+              style="top: ${n.top}; left: ${n.left};"
+            >
+              ${e.digit}
+            </div>
+            <div class="tilt-hints" aria-hidden="true">
+              <span class="tilt-hint tilt-hint--top" data-tilt-hint="top"></span>
+              <span class="tilt-hint tilt-hint--right" data-tilt-hint="right"></span>
+              <span class="tilt-hint tilt-hint--bottom" data-tilt-hint="bottom"></span>
+              <span class="tilt-hint tilt-hint--left" data-tilt-hint="left"></span>
+            </div>
+          </article>
+        `}).join(``),r=t.map((e,t)=>`<span class="photos-dot ${t===this.puzzleIndex?`is-active`:``} ${this.slideLocked[t]?`is-found`:``}" data-photo-dot="${t}"></span>`).join(``);e.innerHTML=`
+      <header class="photos-toolbar">
+        <button type="button" class="photos-toolbar-btn" data-action="albums" aria-label="Albums">
+          <span class="photos-toolbar-chevron" aria-hidden="true">‹</span>
+          <span>Albums</span>
+        </button>
+        <span class="photos-toolbar-title" data-photo-counter>${this.puzzleIndex+1} of ${t.length}</span>
+        <button
+          type="button"
+          class="photos-toolbar-btn photos-toolbar-btn--icon"
+          data-action="view-code"
+          aria-label="View recovered code"
+          ${this.allSlidesLocked()?``:`hidden`}
+        >
+          <span aria-hidden="true">ⓘ</span>
+        </button>
+      </header>
+      <div class="photos-viewport" data-gallery-viewport>
+        <div class="photos-track" data-gallery-track>
+          ${n}
+        </div>
+      </div>
+      <footer class="photos-chrome">
+        <div class="photos-dots" data-photo-dots>${r}</div>
+      </footer>
+    `,this.galleryContainer=e,this.galleryTrack=e.querySelector(`[data-gallery-track]`);let i=e.querySelector(`[data-gallery-viewport]`);i&&this.galleryTrack&&(this.detachGallerySwipe=h(i,this.galleryTrack,{slideCount:t.length,getIndex:()=>this.puzzleIndex,setIndex:e=>this.goToSlide(e),onDrag:e=>{this.galleryDragPx=e,this.updateGalleryTransform(!1)}})),this.attachCalibrationTrigger(e),this.root.append(e),this.updateGalleryTransform(!1),this.startGalleryLoop(e)}goToSlide(e){this.puzzleIndex=e,this.galleryDragPx=0,this.updateGalleryChrome(),this.updateGalleryTransform(!0)}updateGalleryTransform(e){if(!this.galleryTrack)return;let t=this.galleryContainer?.querySelector(`[data-gallery-viewport]`)?.clientWidth??0;this.galleryTrack.style.transition=e?`transform 0.32s cubic-bezier(0.22, 1, 0.36, 1)`:`none`;let n=-this.puzzleIndex*t+this.galleryDragPx;this.galleryTrack.style.transform=`translate3d(${n}px, 0, 0)`}updateGalleryChrome(){if(!this.galleryContainer)return;let e=this.galleryContainer.querySelector(`[data-photo-counter]`);e&&(e.textContent=`${this.puzzleIndex+1} of ${t.length}`);let n=this.galleryContainer.querySelector(`[data-action="view-code"]`);n&&(n.hidden=!this.allSlidesLocked()),this.galleryContainer.querySelectorAll(`[data-photo-dot]`).forEach((e,t)=>{e.classList.toggle(`is-active`,t===this.puzzleIndex),e.classList.toggle(`is-found`,this.slideLocked[t])})}startGalleryLoop(e){let n=e.querySelectorAll(`[data-slide]`),r=()=>{n.forEach((e,n)=>{let r=t[n],i=e.querySelector(`[data-digit-overlay]`),a=e.querySelectorAll(`[data-tilt-hint]`),o=f(this.latestReading,r.target,r.tolerance);i&&(i.style.opacity=String(o));let s=n===this.puzzleIndex;if(!this.slideLocked[n]&&s){let e=c(this.latestReading,r.target,r.tolerance);for(let t of a){let n=t.dataset.tiltHint,r=n?e[n]:0;t.style.opacity=String(r),t.classList.toggle(`is-active`,r>0)}}else if(s)for(let e of a)e.style.opacity=`0`,e.classList.remove(`is-active`);if(!this.slideLocked[n]&&d(o)){this.slideLocked[n]=!0,i?.classList.add(`is-locked`);for(let e of a)e.style.opacity=`0`,e.classList.remove(`is-active`);this.updateGalleryChrome()}}),this.rafId=window.requestAnimationFrame(r)};this.rafId=window.requestAnimationFrame(r)}stopGalleryLoop(){this.rafId!==null&&(window.cancelAnimationFrame(this.rafId),this.rafId=null)}renderSummary(){this.releaseWakeLock();let e=this.createScreen(`summary-screen`);e.innerHTML=`
+      <div class="sheet-backdrop" data-action="close-summary"></div>
+      <div class="info-sheet" role="dialog" aria-labelledby="sheet-title">
+        <div class="info-sheet-handle" aria-hidden="true"></div>
+        <h2 id="sheet-title" class="info-sheet-title">Photo information</h2>
+        <p class="info-sheet-label">Recovered code</p>
+        <p class="code-display">${t.map(e=>e.digit).join(`-`)}</p>
+        <button type="button" class="btn btn-photos" data-action="close-summary">Done</button>
+      </div>
+    `,this.attachCalibrationTrigger(e),this.root.append(e)}renderCalibrate(){let e=this.createScreen(`calibrate-screen`);e.innerHTML=`
+      <div class="calibrate-content">
+        <p class="eyebrow">Staff mode</p>
+        <h1>Calibration</h1>
+        <p class="live-readout" data-live-readout>${i(this.latestReading)}</p>
+        <p class="calibrate-photo-label">Photo ${this.puzzleIndex+1} of ${t.length}</p>
+        <button type="button" class="btn btn-photos" data-action="copy-target">
+          Set as target
+        </button>
+        <p class="hint" data-copy-status hidden></p>
+        <button type="button" class="btn btn-secondary" data-action="exit-calibrate">
+          Back
+        </button>
+      </div>
+    `;let n=()=>{let t=e.querySelector(`[data-live-readout]`);t&&(t.textContent=i(this.latestReading)),this.screen===`calibrate`&&window.requestAnimationFrame(n)};window.requestAnimationFrame(n),e.querySelector(`[data-action="copy-target"]`)?.addEventListener(`click`,()=>{this.copyCurrentTarget(e)}),e.querySelector(`[data-action="exit-calibrate"]`)?.addEventListener(`click`,()=>{let e=this.returnScreen;this.setScreen(e===`summary`?`gallery`:e),e===`gallery`&&this.acquireWakeLock()}),this.root.append(e)}async copyCurrentTarget(e){let t=e.querySelector(`[data-copy-status]`);if(this.latestReading.beta===null||this.latestReading.gamma===null){t&&(t.hidden=!1,t.textContent=`Waiting for sensor data…`);return}let n=a({beta:Math.round(this.latestReading.beta),gamma:Math.round(this.latestReading.gamma)});try{await navigator.clipboard.writeText(n),t&&(t.hidden=!1,t.textContent=`Copied ${n} — paste into puzzles.ts for photo ${this.puzzleIndex+1}`)}catch{t&&(t.hidden=!1,t.textContent=n)}}attachCalibrationTrigger(e){let t=document.createElement(`button`);t.type=`button`,t.className=`calibration-trigger`,t.setAttribute(`aria-label`,`Staff calibration trigger`),t.addEventListener(`click`,()=>{this.calibrationTapCount+=1,this.calibrationTapTimer!==null&&window.clearTimeout(this.calibrationTapTimer),this.calibrationTapTimer=window.setTimeout(()=>{this.calibrationTapCount=0},_),this.calibrationTapCount>=g&&(this.calibrationTapCount=0,this.stopGalleryLoop(),this.releaseWakeLock(),this.returnScreen=this.screen===`gallery`?`gallery`:this.screen,this.setScreen(`calibrate`))}),e.append(t)}createScreen(e){let t=document.createElement(`section`);return t.className=`screen ${e}`,t}async acquireWakeLock(){this.wakeLock=await p()}async releaseWakeLock(){await m(this.wakeLock),this.wakeLock=null}bindNavigation(){this.root.addEventListener(`click`,e=>{let t=e.target;if(!(t instanceof HTMLElement))return;let n=t.closest(`[data-action]`)?.dataset.action;n===`view-code`&&this.setScreen(`summary`),n===`close-summary`&&(this.setScreen(`gallery`),this.acquireWakeLock())})}},y=`modulepreload`,b=function(e){return`/emrot-lots-phone/`+e},x={},S=function(e,t,n){let r=Promise.resolve();if(t&&t.length>0){let e=document.getElementsByTagName(`link`),i=document.querySelector(`meta[property=csp-nonce]`),a=i?.nonce||i?.getAttribute(`nonce`);function o(e){return Promise.all(e.map(e=>Promise.resolve(e).then(e=>({status:`fulfilled`,value:e}),e=>({status:`rejected`,reason:e}))))}r=o(t.map(t=>{if(t=b(t,n),t in x)return;x[t]=!0;let r=t.endsWith(`.css`),i=r?`[rel="stylesheet"]`:``;if(n)for(let n=e.length-1;n>=0;n--){let i=e[n];if(i.href===t&&(!r||i.rel===`stylesheet`))return}else if(document.querySelector(`link[href="${t}"]${i}`))return;let o=document.createElement(`link`);if(o.rel=r?`stylesheet`:y,r||(o.as=`script`),o.crossOrigin=``,o.href=t,a&&o.setAttribute(`nonce`,a),document.head.appendChild(o),r)return new Promise((e,n)=>{o.addEventListener(`load`,e),o.addEventListener(`error`,()=>n(Error(`Unable to preload CSS for ${t}`)))})}))}function i(e){let t=new Event(`vite:preloadError`,{cancelable:!0});if(t.payload=e,window.dispatchEvent(t),!t.defaultPrevented)throw e}return r.then(t=>{for(let e of t||[])e.status===`rejected`&&i(e.reason);return e().catch(i)})},C=`true`,w=`false`,T=C===`true`,E=w===`true`;function D(e={}){let{immediate:t=!1,onNeedReload:n,onNeedRefresh:r,onOfflineReady:i,onRegistered:a,onRegisteredSW:o,onRegisterError:s}=e,c,l,u,d=async(e=!0)=>{await l,T||u?.()};async function f(){if(`serviceWorker`in navigator){if(c=await S(async()=>{let{Workbox:e}=await import(`./workbox-window.prod.es5-Bd17z0YL.js`);return{Workbox:e}},[]).then(({Workbox:e})=>new e(`/emrot-lots-phone/sw.js`,{scope:`/emrot-lots-phone/`,type:`classic`})).catch(e=>{s?.(e)}),!c)return;if(u=()=>{c?.messageSkipWaiting()},!E)if(T)c.addEventListener(`activated`,e=>{(e.isUpdate||e.isExternal)&&(n?n():window.location.reload())}),c.addEventListener(`installed`,e=>{e.isUpdate||i?.()});else{let e=!1,t=()=>{e=!0,c?.addEventListener(`controlling`,e=>{e.isUpdate&&(n?n():window.location.reload())}),r?.()};c.addEventListener(`installed`,n=>{n.isUpdate===void 0?n.isExternal===void 0?!e&&i?.():n.isExternal?t():!e&&i?.():n.isUpdate||i?.()}),c.addEventListener(`waiting`,t)}c.register({immediate:t}).then(e=>{o?o(`/emrot-lots-phone/sw.js`,e):a?.(e)}).catch(e=>{s?.(e)})}}return l=f(),d}var O=document.querySelector(`#app`);if(!O)throw Error(`App root element not found`);new v(O).bindNavigation(),D({immediate:!0,onOfflineReady(){console.info(`Spy Phone is ready to work offline.`)}}),k();async function k(){try{await screen.orientation?.lock?.(`portrait`)}catch{}}
