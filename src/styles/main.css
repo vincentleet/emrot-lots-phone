@@ -245,12 +245,31 @@ h1 {
   background: #000;
 }
 
+.photo-stack {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
 .photos-image {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
   object-fit: contain;
+  object-position: center;
   pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.08s linear;
+}
+
+.photos-image--number {
+  z-index: 1;
+}
+
+.photos-image--number.is-locked {
+  opacity: 1;
 }
 
 .photos-chrome {
@@ -286,28 +305,6 @@ h1 {
 
 .photos-dot.is-found:not(.is-active) {
   background: rgba(255, 214, 10, 0.75);
-}
-
-/* —— Puzzle overlays —— */
-
-.digit-overlay {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  color: #ffd60a;
-  font-size: clamp(2.75rem, 16vw, 5.5rem);
-  font-weight: 700;
-  line-height: 1;
-  text-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.9),
-    0 0 20px rgba(255, 214, 10, 0.5);
-  opacity: 0;
-  transition: opacity 0.08s linear;
-  pointer-events: none;
-  user-select: none;
-}
-
-.digit-overlay.is-locked {
-  color: #ffe566;
 }
 
 .tilt-hints {

@@ -13,16 +13,31 @@ Open the dev URL on your phone over the local network. Motion sensors require a 
 
 ## Adding your car photos
 
-1. Place images in [`public/assets/cars/`](public/assets/cars/) (for example `car1.jpg`, `car2.jpg`).
-2. Edit [`src/config/puzzles.ts`](src/config/puzzles.ts):
-   - Set each `image` path
-   - Set each `digit`
-   - Set `target.beta` / `target.gamma` (tilt angles in degrees)
-   - Adjust `tolerance` (degrees) and optional `overlay` position
+Each puzzle uses **two PNGs** in [`public/assets/cars/`](public/assets/cars/):
+
+| File | Purpose |
+|------|---------|
+| `car1.png` | Full car photo (reveals with a **wide** tilt tolerance) |
+| `car1-number.png` | Same dimensions, **transparent** PNG with the digit artwork baked in (reveals with a **narrow** tolerance) |
+
+Repeat for each photo that hides a code digit (`car3.png` + `car3-number.png`, etc.).
+
+**Decoy photos** (car only, no hidden number): add just `car6.png` and omit the `number` block in config — they still appear in the swipe carousel with tilt arrows and a wide reveal zone.
+
+Edit [`src/config/puzzles.ts`](src/config/puzzles.ts):
+
+- `car.image` — path to the car photo (required)
+- `number.image` — path to the transparent digit PNG (optional)
+- `digit` — code character (required when `number` is set)
+- `target` — `{ beta, gamma }` tilt angles (shared by both layers)
+- `car.tolerance` — degrees for the car (default `18`, wider = easier)
+- `number.tolerance` — degrees for the digit overlay (default `8`, only when `number` is set)
+
+The number layer only becomes clear when you're inside the smaller tolerance zone at the same target orientation.
 
 ## Calibrating tilt angles (staff mode)
 
-Tap the **top-left corner 5 times** within 2 seconds to open calibration mode. Hold the phone at the angle where the digit should appear, then tap **Set as target** to copy values like `{ beta: 45, gamma: -20 }` into `puzzles.ts`.
+Tap the **top-left corner 5 times** within 2 seconds to open calibration mode. Hold the phone at the angle where the number should appear, then tap **Set as target** to copy the `target` (and tolerances) into `puzzles.ts`.
 
 ## Path A — PWA install (brief internet once)
 

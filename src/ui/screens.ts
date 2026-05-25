@@ -1,12 +1,17 @@
 import { puzzles } from '../config/puzzles'
 import type { OrientationReading } from '../config/types'
+import { hasNumberLayer } from '../lib/puzzle'
 import {
   computeTiltHints,
   formatOrientation,
   formatTarget,
   OrientationManager,
 } from '../lib/orientation'
-import { computeRevealOpacity, isDigitFound } from '../lib/reveal'
+import {
+  computeDualRevealOpacity,
+  hintToleranceForDistance,
+  isDigitFound,
+} from '../lib/reveal'
 import { releaseWakeLock, requestWakeLock } from '../lib/wakeLock'
 import { attachGallerySwipe } from './gallery'
 
@@ -37,8 +42,10 @@ export class App {
     this.render()
   }
 
-  private allSlidesLocked(): boolean {
-    return this.slideLocked.every(Boolean)
+  private allCodeSlidesLocked(): boolean {
+    return puzzles.every(
+      (puzzle, index) => !hasNumberLayer(puzzle) || this.slideLocked[index],
+    )
   }
 
   private setScreen(screen: Screen): void {
@@ -135,21 +142,27 @@ export class App {
     const container = this.createScreen('gallery-screen')
     const slidesHtml = puzzles
       .map((puzzle, index) => {
-        const overlay = puzzle.overlay ?? { top: '45%', left: '50%' }
+        const numberLayer = puzzle.number
+          ? `<img
+                class="photos-image photos-image--number ${this.slideLocked[index] ? 'is-locked' : ''}"
+                data-number-layer
+                src="${puzzle.number.image}"
+                alt=""
+                draggable="false"
+              />`
+          : ''
+
         return `
           <article class="photos-slide" data-slide data-slide-index="${index}">
-            <img
-              class="photos-image"
-              src="${puzzle.image}"
-              alt="Photo ${index + 1}"
-              draggable="false"
-            />
-            <div
-              class="digit-overlay ${this.slideLocked[index] ? 'is-locked' : ''}"
-              data-digit-overlay
-              style="top: ${overlay.top}; left: ${overlay.left};"
-            >
-              ${puzzle.digit}
+            <div class="photo-stack">
+              <img
+                class="photos-image photos-image--car"
+                data-car-layer
+                src="${puzzle.car.image}"
+                alt="Photo ${index + 1}"
+                draggable="false"
+              />
+              ${numberLayer}
             </div>
             <div class="tilt-hints" aria-hidden="true">
               <span class="tilt-hint tilt-hint--top" data-tilt-hint="top"></span>
@@ -165,7 +178,7 @@ export class App {
     const dotsHtml = puzzles
       .map(
         (_, index) =>
-          `<span class="photos-dot ${index === this.puzzleIndex ? 'is-active' : ''} ${this.slideLocked[index] ? 'is-found' : ''}" data-photo-dot="${index}"></span>`,
+          `<span class="photos-dot ${index === this.puzzleIndex ? 'is-active' : ''} ${this.slideLocked[index] && hasNumberLayer(puzzles[index]) ? 'is-found' : ''}" data-photo-dot="${index}"></span>`,
       )
       .join('')
 
@@ -181,7 +194,7 @@ export class App {
           class="photos-toolbar-btn photos-toolbar-btn--icon"
           data-action="view-code"
           aria-label="View recovered code"
-          ${this.allSlidesLocked() ? '' : 'hidden'}
+          ${this.allCodeSlidesLocked() ? '' : 'hidden'}
         >
           <span aria-hidden="true">ⓘ</span>
         </button>
@@ -252,13 +265,13 @@ export class App {
 
     const codeButton = this.galleryContainer.querySelector('[data-action="view-code"]') as HTMLElement | null
     if (codeButton) {
-      codeButton.hidden = !this.allSlidesLocked()
+      codeButton.hidden = !this.allCodeSlidesLocked()
     }
 
     const dots = this.galleryContainer.querySelectorAll('[data-photo-dot]')
     dots.forEach((dot, index) => {
       dot.classList.toggle('is-active', index === this.puzzleIndex)
-      dot.classList.toggle('is-found', this.slideLocked[index])
+      dot.classList.toggle('is-found', this.slideLocked[index] && hasNumberLayer(puzzles[index]))
     })
   }
 
@@ -268,22 +281,32 @@ export class App {
     const tick = () => {
       slides.forEach((slide, index) => {
         const puzzle = puzzles[index]
-        const overlay = slide.querySelector('[data-digit-overlay]') as HTMLElement | null
+        const carLayer = slide.querySelector('[data-car-layer]') as HTMLElement | null
+        const numberLayer = slide.querySelector('[data-number-layer]') as HTMLElement | null
         const hintElements = slide.querySelectorAll<HTMLElement>('[data-tilt-hint]')
-        const opacity = computeRevealOpacity(
+        const { car, number, distance } = computeDualRevealOpacity(
           this.latestReading,
           puzzle.target,
-          puzzle.tolerance,
+          puzzle.car.tolerance,
+          puzzle.number?.tolerance,
         )
 
-        if (overlay) {
-          overlay.style.opacity = String(opacity)
+        if (carLayer) {
+          carLayer.style.opacity = String(car)
+        }
+        if (numberLayer) {
+          numberLayer.style.opacity = String(number)
         }
 
         const isActive = index === this.puzzleIndex
 
         if (!this.slideLocked[index] && isActive) {
-          const hints = computeTiltHints(this.latestReading, puzzle.target, puzzle.tolerance)
+          const hintTolerance = hintToleranceForDistance(
+            distance,
+            puzzle.car.tolerance,
+            puzzle.number?.tolerance,
+          )
+          const hints = computeTiltHints(this.latestReading, puzzle.target, hintTolerance)
           for (const element of hintElements) {
             const side = element.dataset.tiltHint as keyof typeof hints | undefined
             const strength = side ? hints[side] : 0
@@ -297,9 +320,15 @@ export class App {
           }
         }
 
-        if (!this.slideLocked[index] && isDigitFound(opacity)) {
+        if (!this.slideLocked[index] && puzzle.number && isDigitFound(number)) {
           this.slideLocked[index] = true
-          overlay?.classList.add('is-locked')
+          numberLayer?.classList.add('is-locked')
+          if (carLayer) {
+            carLayer.style.opacity = '1'
+          }
+          if (numberLayer) {
+            numberLayer.style.opacity = '1'
+          }
           for (const element of hintElements) {
             element.style.opacity = '0'
             element.classList.remove('is-active')
@@ -325,7 +354,10 @@ export class App {
     void this.releaseWakeLock()
 
     const container = this.createScreen('summary-screen')
-    const code = puzzles.map((puzzle) => puzzle.digit).join('-')
+    const code = puzzles
+      .filter(hasNumberLayer)
+      .map((puzzle) => puzzle.digit)
+      .join('-')
 
     container.innerHTML = `
       <div class="sheet-backdrop" data-action="close-summary"></div>
@@ -403,13 +435,21 @@ export class App {
       beta: Math.round(this.latestReading.beta),
       gamma: Math.round(this.latestReading.gamma),
     }
-    const snippet = formatTarget(target)
+    const puzzle = puzzles[this.puzzleIndex]
+    const lines = [
+      `target: ${formatTarget(target)},`,
+      `car: { tolerance: ${puzzle.car.tolerance} },`,
+    ]
+    if (puzzle.number) {
+      lines.push(`number: { tolerance: ${puzzle.number.tolerance} },`)
+    }
+    const snippet = lines.join('\n  ')
 
     try {
       await navigator.clipboard.writeText(snippet)
       if (status) {
         status.hidden = false
-        status.textContent = `Copied ${snippet} — paste into puzzles.ts for photo ${this.puzzleIndex + 1}`
+        status.textContent = `Copied target for photo ${this.puzzleIndex + 1} — paste into puzzles.ts`
       }
     } catch {
       if (status) {

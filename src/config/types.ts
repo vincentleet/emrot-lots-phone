@@ -3,18 +3,19 @@ export interface OrientationTarget {
   gamma: number
 }
 
-export interface OverlayPosition {
-  top: string
-  left: string
+export interface PuzzleLayer {
+  image: string
+  tolerance: number
 }
 
 export interface Puzzle {
   id: string
-  image: string
-  digit: string
   target: OrientationTarget
-  tolerance: number
-  overlay?: OverlayPosition
+  car: PuzzleLayer
+  /** Transparent number PNG; omit for decoy photos (car + wide tilt only). */
+  number?: PuzzleLayer
+  /** Code character; required when `number` is set. */
+  digit?: string
 }
 
 export interface OrientationReading {
