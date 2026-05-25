@@ -264,7 +264,7 @@ h1 {
   object-position: center;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 0.08s linear;
+  transition: opacity 0.14s ease-out;
 }
 
 .photos-image--car {

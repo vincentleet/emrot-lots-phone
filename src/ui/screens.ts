@@ -11,6 +11,8 @@ import {
   computeDualRevealOpacity,
   hintToleranceForDistance,
   isDigitFound,
+  lerpLayerOpacity,
+  type SmoothedLayerOpacity,
 } from '../lib/reveal'
 import { releaseWakeLock, requestWakeLock } from '../lib/wakeLock'
 import { attachGallerySwipe } from './gallery'
@@ -26,6 +28,7 @@ export class App {
   private screen: Screen = 'intro'
   private puzzleIndex = 0
   private slideLocked: boolean[] = puzzles.map(() => false)
+  private smoothedOpacity: SmoothedLayerOpacity[] = puzzles.map(() => ({ car: 0, number: 0 }))
   private galleryContainer: HTMLElement | null = null
   private galleryTrack: HTMLElement | null = null
   private galleryDragPx = 0
@@ -137,6 +140,7 @@ export class App {
 
     this.puzzleIndex = 0
     this.slideLocked = puzzles.map(() => false)
+    this.smoothedOpacity = puzzles.map(() => ({ car: 0, number: 0 }))
     this.setScreen('gallery')
     void this.acquireWakeLock()
   }
@@ -298,11 +302,20 @@ export class App {
           puzzle.number?.tolerance,
         )
 
+        const hasReading = distance !== null
+        this.smoothedOpacity[index] = lerpLayerOpacity(
+          this.smoothedOpacity[index],
+          { car, number },
+          hasReading,
+        )
+        const displayCar = this.slideLocked[index] ? 1 : this.smoothedOpacity[index].car
+        const displayNumber = this.slideLocked[index] ? 1 : this.smoothedOpacity[index].number
+
         if (carLayer) {
-          carLayer.style.opacity = String(car)
+          carLayer.style.opacity = String(displayCar)
         }
         if (numberLayer) {
-          numberLayer.style.opacity = String(number)
+          numberLayer.style.opacity = String(displayNumber)
         }
         const isActive = index === this.puzzleIndex
 
@@ -326,7 +339,7 @@ export class App {
           }
         }
 
-        if (!this.slideLocked[index] && puzzle.number && isDigitFound(number)) {
+        if (!this.slideLocked[index] && puzzle.number && isDigitFound(displayNumber)) {
           this.slideLocked[index] = true
           numberLayer?.classList.add('is-locked')
           if (carLayer) {

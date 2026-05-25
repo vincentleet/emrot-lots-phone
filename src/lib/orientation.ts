@@ -74,6 +74,18 @@ export class OrientationManager {
   }
 }
 
+/** Shortest signed difference between two angles in degrees. */
+export function normalizeAngleDelta(reading: number, target: number): number {
+  let delta = reading - target
+  while (delta > 180) {
+    delta -= 360
+  }
+  while (delta < -180) {
+    delta += 360
+  }
+  return delta
+}
+
 export function angularDistance(
   reading: OrientationReading,
   target: OrientationTarget,
@@ -82,8 +94,8 @@ export function angularDistance(
     return null
   }
 
-  const betaDelta = reading.beta - target.beta
-  const gammaDelta = reading.gamma - target.gamma
+  const betaDelta = normalizeAngleDelta(reading.beta, target.beta)
+  const gammaDelta = normalizeAngleDelta(reading.gamma, target.gamma)
   return Math.sqrt(betaDelta * betaDelta + gammaDelta * gammaDelta)
 }
 
@@ -130,8 +142,8 @@ export function computeTiltHints(
     return hidden
   }
 
-  const betaCorrection = target.beta - reading.beta
-  const gammaCorrection = target.gamma - reading.gamma
+  const betaCorrection = normalizeAngleDelta(target.beta, reading.beta)
+  const gammaCorrection = normalizeAngleDelta(target.gamma, reading.gamma)
 
   return {
     top: betaCorrection < -MIN_HINT_DELTA_DEG ? hintIntensity(betaCorrection, tolerance) : 0,
