@@ -3,6 +3,9 @@ import { angularDistance } from './orientation'
 
 export const FOUND_OPACITY_THRESHOLD = 0.9
 
+/** Faintest car visibility at the outer edge of the wide zone. */
+const CAR_EDGE_OPACITY = 0.12
+
 export interface DualRevealOpacities {
   car: number
   number: number
@@ -34,6 +37,36 @@ export function computeRevealOpacity(
   return opacityFromDistance(distance, tolerance)
 }
 
+/**
+ * Car fades in across the wide zone and reaches 100% at the inner (number) edge.
+ * Number still uses the narrow tolerance on top.
+ */
+export function carOpacityFromDistance(
+  distance: number | null,
+  carTolerance: number,
+  numberTolerance?: number,
+): number {
+  if (distance === null || distance > carTolerance) {
+    return 0
+  }
+
+  if (numberTolerance === undefined) {
+    return opacityFromDistance(distance, carTolerance)
+  }
+
+  if (distance <= numberTolerance) {
+    return 1
+  }
+
+  const span = carTolerance - numberTolerance
+  if (span <= 0) {
+    return opacityFromDistance(distance, carTolerance)
+  }
+
+  const t = (distance - numberTolerance) / span
+  return 1 - t * (1 - CAR_EDGE_OPACITY)
+}
+
 export function computeDualRevealOpacity(
   reading: OrientationReading,
   target: OrientationTarget,
@@ -42,7 +75,7 @@ export function computeDualRevealOpacity(
 ): DualRevealOpacities {
   const distance = angularDistance(reading, target)
   return {
-    car: opacityFromDistance(distance, carTolerance),
+    car: carOpacityFromDistance(distance, carTolerance, numberTolerance),
     number:
       numberTolerance === undefined
         ? 0

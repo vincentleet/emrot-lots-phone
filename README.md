@@ -30,7 +30,7 @@ Edit [`src/config/puzzles.ts`](src/config/puzzles.ts):
 - `number.image` — path to the transparent digit PNG (optional)
 - `digit` — code character (required when `number` is set)
 - `target` — `{ beta, gamma }` tilt angles (shared by both layers)
-- `car.tolerance` — degrees for the car (default `18`, wider = easier)
+- `car.tolerance` — degrees for the car (default `32`, wider = easier). The car reaches full opacity as you enter the number zone.
 - `number.tolerance` — degrees for the digit overlay (default `8`, only when `number` is set)
 
 The number layer only becomes clear when you're inside the smaller tolerance zone at the same target orientation.

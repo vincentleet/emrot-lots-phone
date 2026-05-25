@@ -30,6 +30,7 @@ export class App {
   private galleryTrack: HTMLElement | null = null
   private galleryDragPx = 0
   private detachGallerySwipe: (() => void) | null = null
+  private galleryResizeObserver: ResizeObserver | null = null
   private wakeLock: WakeLockSentinel | null = null
   private rafId: number | null = null
   private calibrationTapCount = 0
@@ -52,6 +53,8 @@ export class App {
     this.stopGalleryLoop()
     this.detachGallerySwipe?.()
     this.detachGallerySwipe = null
+    this.galleryResizeObserver?.disconnect()
+    this.galleryResizeObserver = null
     this.galleryContainer = null
     this.galleryTrack = null
     this.screen = screen
@@ -229,6 +232,11 @@ export class App {
     this.root.append(container)
     this.updateGalleryTransform(false)
     this.startGalleryLoop(container)
+
+    this.galleryResizeObserver = new ResizeObserver(() => this.updateGalleryTransform(false))
+    if (viewport) {
+      this.galleryResizeObserver.observe(viewport)
+    }
   }
 
   private goToSlide(index: number): void {
