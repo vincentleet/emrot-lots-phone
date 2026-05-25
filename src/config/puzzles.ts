@@ -3,15 +3,15 @@ import type { Puzzle } from './types'
 export const puzzles: Puzzle[] = [
   {
     id: 'car1',
-    image: '/assets/cars/car1.svg',
+    image: '/assets/cars/car1.png',
     digit: '4',
     target: { beta: 45, gamma: -20 },
     tolerance: 12,
     overlay: { top: '42%', left: '58%' },
   },
   {
-    id: 'car2',
-    image: '/assets/cars/car2.svg',
+    id: 'car6',
+    image: '/assets/cars/car6.png',
     digit: '7',
     target: { beta: 30, gamma: 25 },
     tolerance: 12,
@@ -19,15 +19,15 @@ export const puzzles: Puzzle[] = [
   },
   {
     id: 'car3',
-    image: '/assets/cars/car3.svg',
+    image: '/assets/cars/car3.png',
     digit: '2',
     target: { beta: 60, gamma: -10 },
     tolerance: 12,
     overlay: { top: '55%', left: '50%' },
   },
   {
-    id: 'car4',
-    image: '/assets/cars/car4.svg',
+    id: 'car7',
+    image: '/assets/cars/car7.png',
     digit: '9',
     target: { beta: 20, gamma: -35 },
     tolerance: 12,

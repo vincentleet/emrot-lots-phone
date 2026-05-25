@@ -1,5 +1,5 @@
 import { puzzles } from '../config/puzzles'
-import type { OrientationReading, Puzzle } from '../config/types'
+import type { OrientationReading } from '../config/types'
 import {
   computeTiltHints,
   formatOrientation,
@@ -8,24 +8,25 @@ import {
 } from '../lib/orientation'
 import { computeRevealOpacity, isDigitFound } from '../lib/reveal'
 import { releaseWakeLock, requestWakeLock } from '../lib/wakeLock'
+import { attachGallerySwipe } from './gallery'
 
-type Screen = 'intro' | 'puzzle' | 'summary' | 'calibrate'
+type Screen = 'intro' | 'gallery' | 'summary' | 'calibrate'
 
 const CALIBRATION_TAP_COUNT = 5
 const CALIBRATION_TAP_WINDOW_MS = 2000
-const LOCKED_FEEDBACK_MS = 1000
 
 export class App {
   private root: HTMLElement
   private orientation = new OrientationManager()
   private screen: Screen = 'intro'
   private puzzleIndex = 0
-  private foundDigits: string[] = []
-  private currentOpacity = 0
-  private puzzleLocked = false
+  private slideLocked: boolean[] = puzzles.map(() => false)
+  private galleryContainer: HTMLElement | null = null
+  private galleryTrack: HTMLElement | null = null
+  private galleryDragPx = 0
+  private detachGallerySwipe: (() => void) | null = null
   private wakeLock: WakeLockSentinel | null = null
   private rafId: number | null = null
-  private lockedTimer: number | null = null
   private calibrationTapCount = 0
   private calibrationTapTimer: number | null = null
   private returnScreen: Screen = 'intro'
@@ -36,11 +37,16 @@ export class App {
     this.render()
   }
 
-  private get currentPuzzle(): Puzzle {
-    return puzzles[this.puzzleIndex]
+  private allSlidesLocked(): boolean {
+    return this.slideLocked.every(Boolean)
   }
 
   private setScreen(screen: Screen): void {
+    this.stopGalleryLoop()
+    this.detachGallerySwipe?.()
+    this.detachGallerySwipe = null
+    this.galleryContainer = null
+    this.galleryTrack = null
     this.screen = screen
     this.render()
   }
@@ -52,8 +58,8 @@ export class App {
       case 'intro':
         this.renderIntro()
         break
-      case 'puzzle':
-        this.renderPuzzle()
+      case 'gallery':
+        this.renderGallery()
         break
       case 'summary':
         this.renderSummary()
@@ -68,16 +74,16 @@ export class App {
     const container = this.createScreen('intro-screen')
     container.innerHTML = `
       <div class="intro-content">
-        <p class="eyebrow">Classified</p>
-        <h1>Legacy of the Spy Phone</h1>
-        <p class="lede">Tilt the phone to reveal hidden numbers on each vehicle photo.</p>
+        <div class="photos-app-icon" aria-hidden="true"></div>
+        <h1>Photos</h1>
+        <p class="lede">Allow motion access to view your library.</p>
         ${
           !this.orientation.isSecureContext
-            ? '<p class="warning">Motion sensors require HTTPS or the installed app. Do not open this as a local file.</p>'
+            ? '<p class="warning">Open via HTTPS or the installed app — not as a local file.</p>'
             : ''
         }
-        <button type="button" class="btn btn-primary" data-action="enable-sensors">
-          Enable motion sensors
+        <button type="button" class="btn btn-photos" data-action="enable-sensors">
+          Continue
         </button>
         <p class="hint" data-sensor-status hidden></p>
       </div>
@@ -97,7 +103,7 @@ export class App {
 
     if (button) {
       button.disabled = true
-      button.textContent = 'Enabling…'
+      button.textContent = 'Loading…'
     }
 
     const granted = await this.orientation.requestAccess()
@@ -105,12 +111,12 @@ export class App {
     if (!granted) {
       if (button) {
         button.disabled = false
-        button.textContent = 'Enable motion sensors'
+        button.textContent = 'Continue'
       }
       if (status) {
         status.hidden = false
         status.textContent =
-          'Sensors unavailable. Install via HTTPS or the APK, then tap again.'
+          'Motion access unavailable. Install via HTTPS or the APK, then try again.'
       }
       return
     }
@@ -120,95 +126,187 @@ export class App {
     })
 
     this.puzzleIndex = 0
-    this.foundDigits = []
-    this.setScreen('puzzle')
+    this.slideLocked = puzzles.map(() => false)
+    this.setScreen('gallery')
     void this.acquireWakeLock()
   }
 
-  private renderPuzzle(): void {
-    const puzzle = this.currentPuzzle
-    const overlay = puzzle.overlay ?? { top: '45%', left: '50%' }
-    const container = this.createScreen('puzzle-screen')
+  private renderGallery(): void {
+    const container = this.createScreen('gallery-screen')
+    const slidesHtml = puzzles
+      .map((puzzle, index) => {
+        const overlay = puzzle.overlay ?? { top: '45%', left: '50%' }
+        return `
+          <article class="photos-slide" data-slide data-slide-index="${index}">
+            <img
+              class="photos-image"
+              src="${puzzle.image}"
+              alt="Photo ${index + 1}"
+              draggable="false"
+            />
+            <div
+              class="digit-overlay ${this.slideLocked[index] ? 'is-locked' : ''}"
+              data-digit-overlay
+              style="top: ${overlay.top}; left: ${overlay.left};"
+            >
+              ${puzzle.digit}
+            </div>
+            <div class="tilt-hints" aria-hidden="true">
+              <span class="tilt-hint tilt-hint--top" data-tilt-hint="top"></span>
+              <span class="tilt-hint tilt-hint--right" data-tilt-hint="right"></span>
+              <span class="tilt-hint tilt-hint--bottom" data-tilt-hint="bottom"></span>
+              <span class="tilt-hint tilt-hint--left" data-tilt-hint="left"></span>
+            </div>
+          </article>
+        `
+      })
+      .join('')
+
+    const dotsHtml = puzzles
+      .map(
+        (_, index) =>
+          `<span class="photos-dot ${index === this.puzzleIndex ? 'is-active' : ''} ${this.slideLocked[index] ? 'is-found' : ''}" data-photo-dot="${index}"></span>`,
+      )
+      .join('')
 
     container.innerHTML = `
-      <div class="puzzle-header">
-        <span class="puzzle-count">${this.puzzleIndex + 1} / ${puzzles.length}</span>
-      </div>
-      <div class="puzzle-stage">
-        <img class="puzzle-image" src="${puzzle.image}" alt="Vehicle photo ${this.puzzleIndex + 1}" />
-        <div
-          class="digit-overlay ${this.puzzleLocked ? 'is-locked' : ''}"
-          data-digit-overlay
-          style="top: ${overlay.top}; left: ${overlay.left}; opacity: ${this.currentOpacity};"
-        >
-          ${puzzle.digit}
-        </div>
-        <div class="tilt-hints" data-tilt-hints aria-hidden="true">
-          <span class="tilt-hint tilt-hint--top" data-tilt-hint="top"></span>
-          <span class="tilt-hint tilt-hint--right" data-tilt-hint="right"></span>
-          <span class="tilt-hint tilt-hint--bottom" data-tilt-hint="bottom"></span>
-          <span class="tilt-hint tilt-hint--left" data-tilt-hint="left"></span>
-        </div>
-        <div class="locked-banner" data-locked-banner hidden>Number locked</div>
-      </div>
-      <div class="puzzle-footer">
-        <p class="puzzle-hint">Hold the phone at the correct angle to reveal the digit.</p>
-        <button type="button" class="btn btn-primary" data-action="next" disabled>
-          Next photo
+      <header class="photos-toolbar">
+        <button type="button" class="photos-toolbar-btn" data-action="albums" aria-label="Albums">
+          <span class="photos-toolbar-chevron" aria-hidden="true">‹</span>
+          <span>Albums</span>
         </button>
+        <span class="photos-toolbar-title" data-photo-counter>${this.puzzleIndex + 1} of ${puzzles.length}</span>
+        <button
+          type="button"
+          class="photos-toolbar-btn photos-toolbar-btn--icon"
+          data-action="view-code"
+          aria-label="View recovered code"
+          ${this.allSlidesLocked() ? '' : 'hidden'}
+        >
+          <span aria-hidden="true">ⓘ</span>
+        </button>
+      </header>
+      <div class="photos-viewport" data-gallery-viewport>
+        <div class="photos-track" data-gallery-track>
+          ${slidesHtml}
+        </div>
       </div>
+      <footer class="photos-chrome">
+        <div class="photos-dots" data-photo-dots>${dotsHtml}</div>
+      </footer>
     `
+
+    this.galleryContainer = container
+    this.galleryTrack = container.querySelector('[data-gallery-track]')
+
+    const viewport = container.querySelector('[data-gallery-viewport]') as HTMLElement | null
+    if (viewport && this.galleryTrack) {
+      this.detachGallerySwipe = attachGallerySwipe(viewport, this.galleryTrack, {
+        slideCount: puzzles.length,
+        getIndex: () => this.puzzleIndex,
+        setIndex: (index) => this.goToSlide(index),
+        onDrag: (dragPx) => {
+          this.galleryDragPx = dragPx
+          this.updateGalleryTransform(false)
+        },
+      })
+    }
 
     this.attachCalibrationTrigger(container)
     this.root.append(container)
-
-    this.puzzleLocked = false
-    this.currentOpacity = 0
-    this.startPuzzleLoop(container)
+    this.updateGalleryTransform(false)
+    this.startGalleryLoop(container)
   }
 
-  private startPuzzleLoop(container: HTMLElement): void {
-    const overlay = container.querySelector('[data-digit-overlay]') as HTMLElement | null
-    const nextButton = container.querySelector('[data-action="next"]') as HTMLButtonElement | null
-    const lockedBanner = container.querySelector('[data-locked-banner]') as HTMLElement | null
-    const hintElements = container.querySelectorAll<HTMLElement>('[data-tilt-hint]')
-    const puzzle = this.currentPuzzle
+  private goToSlide(index: number): void {
+    this.puzzleIndex = index
+    this.galleryDragPx = 0
+    this.updateGalleryChrome()
+    this.updateGalleryTransform(true)
+  }
+
+  private updateGalleryTransform(animate: boolean): void {
+    if (!this.galleryTrack) {
+      return
+    }
+
+    const viewport = this.galleryContainer?.querySelector('[data-gallery-viewport]') as HTMLElement | null
+    const viewportWidth = viewport?.clientWidth ?? 0
+
+    this.galleryTrack.style.transition = animate
+      ? 'transform 0.32s cubic-bezier(0.22, 1, 0.36, 1)'
+      : 'none'
+    const x = -this.puzzleIndex * viewportWidth + this.galleryDragPx
+    this.galleryTrack.style.transform = `translate3d(${x}px, 0, 0)`
+  }
+
+  private updateGalleryChrome(): void {
+    if (!this.galleryContainer) {
+      return
+    }
+
+    const counter = this.galleryContainer.querySelector('[data-photo-counter]')
+    if (counter) {
+      counter.textContent = `${this.puzzleIndex + 1} of ${puzzles.length}`
+    }
+
+    const codeButton = this.galleryContainer.querySelector('[data-action="view-code"]') as HTMLElement | null
+    if (codeButton) {
+      codeButton.hidden = !this.allSlidesLocked()
+    }
+
+    const dots = this.galleryContainer.querySelectorAll('[data-photo-dot]')
+    dots.forEach((dot, index) => {
+      dot.classList.toggle('is-active', index === this.puzzleIndex)
+      dot.classList.toggle('is-found', this.slideLocked[index])
+    })
+  }
+
+  private startGalleryLoop(container: HTMLElement): void {
+    const slides = container.querySelectorAll<HTMLElement>('[data-slide]')
 
     const tick = () => {
-      const opacity = computeRevealOpacity(this.latestReading, puzzle.target, puzzle.tolerance)
-      this.currentOpacity = opacity
+      slides.forEach((slide, index) => {
+        const puzzle = puzzles[index]
+        const overlay = slide.querySelector('[data-digit-overlay]') as HTMLElement | null
+        const hintElements = slide.querySelectorAll<HTMLElement>('[data-tilt-hint]')
+        const opacity = computeRevealOpacity(
+          this.latestReading,
+          puzzle.target,
+          puzzle.tolerance,
+        )
 
-      if (overlay) {
-        overlay.style.opacity = String(opacity)
-      }
-
-      if (!this.puzzleLocked) {
-        const hints = computeTiltHints(this.latestReading, puzzle.target, puzzle.tolerance)
-        for (const element of hintElements) {
-          const side = element.dataset.tiltHint as keyof typeof hints | undefined
-          const strength = side ? hints[side] : 0
-          element.style.opacity = String(strength)
-          element.classList.toggle('is-active', strength > 0)
-        }
-      }
-
-      if (!this.puzzleLocked && isDigitFound(opacity)) {
-        this.puzzleLocked = true
-        overlay?.classList.add('is-locked')
-        for (const element of hintElements) {
-          element.style.opacity = '0'
-          element.classList.remove('is-active')
-        }
-        if (lockedBanner) {
-          lockedBanner.hidden = false
+        if (overlay) {
+          overlay.style.opacity = String(opacity)
         }
 
-        this.lockedTimer = window.setTimeout(() => {
-          if (nextButton) {
-            nextButton.disabled = false
+        const isActive = index === this.puzzleIndex
+
+        if (!this.slideLocked[index] && isActive) {
+          const hints = computeTiltHints(this.latestReading, puzzle.target, puzzle.tolerance)
+          for (const element of hintElements) {
+            const side = element.dataset.tiltHint as keyof typeof hints | undefined
+            const strength = side ? hints[side] : 0
+            element.style.opacity = String(strength)
+            element.classList.toggle('is-active', strength > 0)
           }
-        }, LOCKED_FEEDBACK_MS)
-      }
+        } else if (isActive) {
+          for (const element of hintElements) {
+            element.style.opacity = '0'
+            element.classList.remove('is-active')
+          }
+        }
+
+        if (!this.slideLocked[index] && isDigitFound(opacity)) {
+          this.slideLocked[index] = true
+          overlay?.classList.add('is-locked')
+          for (const element of hintElements) {
+            element.style.opacity = '0'
+            element.classList.remove('is-active')
+          }
+          this.updateGalleryChrome()
+        }
+      })
 
       this.rafId = window.requestAnimationFrame(tick)
     }
@@ -216,14 +314,10 @@ export class App {
     this.rafId = window.requestAnimationFrame(tick)
   }
 
-  private stopPuzzleLoop(): void {
+  private stopGalleryLoop(): void {
     if (this.rafId !== null) {
       window.cancelAnimationFrame(this.rafId)
       this.rafId = null
-    }
-    if (this.lockedTimer !== null) {
-      window.clearTimeout(this.lockedTimer)
-      this.lockedTimer = null
     }
   }
 
@@ -231,14 +325,16 @@ export class App {
     void this.releaseWakeLock()
 
     const container = this.createScreen('summary-screen')
-    const code = this.foundDigits.join('-')
+    const code = puzzles.map((puzzle) => puzzle.digit).join('-')
 
     container.innerHTML = `
-      <div class="summary-content">
-        <p class="eyebrow">Transmission complete</p>
-        <h1>Recovered code</h1>
+      <div class="sheet-backdrop" data-action="close-summary"></div>
+      <div class="info-sheet" role="dialog" aria-labelledby="sheet-title">
+        <div class="info-sheet-handle" aria-hidden="true"></div>
+        <h2 id="sheet-title" class="info-sheet-title">Photo information</h2>
+        <p class="info-sheet-label">Recovered code</p>
         <p class="code-display">${code}</p>
-        <p class="lede">Use this code to continue the mission.</p>
+        <button type="button" class="btn btn-photos" data-action="close-summary">Done</button>
       </div>
     `
 
@@ -254,7 +350,8 @@ export class App {
         <p class="eyebrow">Staff mode</p>
         <h1>Calibration</h1>
         <p class="live-readout" data-live-readout>${formatOrientation(this.latestReading)}</p>
-        <button type="button" class="btn btn-primary" data-action="copy-target">
+        <p class="calibrate-photo-label">Photo ${this.puzzleIndex + 1} of ${puzzles.length}</p>
+        <button type="button" class="btn btn-photos" data-action="copy-target">
           Set as target
         </button>
         <p class="hint" data-copy-status hidden></p>
@@ -282,8 +379,8 @@ export class App {
 
     container.querySelector('[data-action="exit-calibrate"]')?.addEventListener('click', () => {
       const nextScreen = this.returnScreen
-      this.setScreen(nextScreen)
-      if (nextScreen === 'puzzle') {
+      this.setScreen(nextScreen === 'summary' ? 'gallery' : nextScreen)
+      if (nextScreen === 'gallery') {
         void this.acquireWakeLock()
       }
     })
@@ -312,7 +409,7 @@ export class App {
       await navigator.clipboard.writeText(snippet)
       if (status) {
         status.hidden = false
-        status.textContent = `Copied ${snippet} — paste into puzzles.ts`
+        status.textContent = `Copied ${snippet} — paste into puzzles.ts for photo ${this.puzzleIndex + 1}`
       }
     } catch {
       if (status) {
@@ -340,9 +437,9 @@ export class App {
 
       if (this.calibrationTapCount >= CALIBRATION_TAP_COUNT) {
         this.calibrationTapCount = 0
-        this.stopPuzzleLoop()
+        this.stopGalleryLoop()
         void this.releaseWakeLock()
-        this.returnScreen = this.screen
+        this.returnScreen = this.screen === 'gallery' ? 'gallery' : this.screen
         this.setScreen('calibrate')
       }
     })
@@ -372,17 +469,20 @@ export class App {
         return
       }
 
-      if (target.dataset.action === 'next') {
-        this.stopPuzzleLoop()
-        this.foundDigits.push(this.currentPuzzle.digit)
+      const actionTarget = target.closest<HTMLElement>('[data-action]')
+      const action = actionTarget?.dataset.action
 
-        if (this.puzzleIndex < puzzles.length - 1) {
-          this.puzzleIndex += 1
-          this.setScreen('puzzle')
-        } else {
-          this.setScreen('summary')
-          this.orientation.stop()
-        }
+      if (action === 'view-code') {
+        this.setScreen('summary')
+      }
+
+      if (action === 'close-summary') {
+        this.setScreen('gallery')
+        void this.acquireWakeLock()
+      }
+
+      if (action === 'albums') {
+        // Decorative — stays in gallery
       }
     })
   }
