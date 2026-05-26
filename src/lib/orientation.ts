@@ -224,61 +224,125 @@ export function formatTarget(target: OrientationTarget): string {
   return `{ beta: ${target.beta}, gamma: ${target.gamma} }`
 }
 
-export interface TiltHints {
-  top: number
-  right: number
-  bottom: number
-  left: number
+export interface TiltHintSideState {
+  /** 0–1 scales arrow size; farther from target on this axis → larger. */
+  strength: number
+  /** This axis (up/down or left/right) is aligned with the target. */
+  locked: boolean
 }
+
+export interface TiltHintsState {
+  top: TiltHintSideState
+  right: TiltHintSideState
+  bottom: TiltHintSideState
+  left: TiltHintSideState
+}
+
+const EMPTY_SIDE: TiltHintSideState = { strength: 0, locked: false }
 
 /** True for Android phones/tablets (accel fallback uses inverted tilt axes). */
 export function isAndroidDevice(): boolean {
   return /android/i.test(navigator.userAgent)
 }
 
+export type TiltHintSide = keyof TiltHintsState
+
+const TILT_LABELS_IOS: Record<TiltHintSide, string> = {
+  top: 'Tilt up',
+  bottom: 'Tilt down',
+  left: 'Tilt left',
+  right: 'Tilt right',
+}
+
+const TILT_LABELS_ANDROID: Record<TiltHintSide, string> = {
+  top: 'Tilt down',
+  bottom: 'Tilt up',
+  left: 'Tilt right',
+  right: 'Tilt left',
+}
+
+export function tiltHintLabel(side: TiltHintSide): string {
+  return (isAndroidDevice() ? TILT_LABELS_ANDROID : TILT_LABELS_IOS)[side]
+}
+
 /** Swap edge hints — used when accelerometer tilt axes are inverted vs iOS gyro. */
-export function invertTiltHints(hints: TiltHints): TiltHints {
+export function invertTiltHintState(state: TiltHintsState): TiltHintsState {
+  const betaLocked = state.top.locked || state.bottom.locked
+  const gammaLocked = state.left.locked || state.right.locked
   return {
-    top: hints.bottom,
-    bottom: hints.top,
-    left: hints.right,
-    right: hints.left,
+    top: { strength: state.bottom.strength, locked: betaLocked },
+    bottom: { strength: state.top.strength, locked: betaLocked },
+    left: { strength: state.right.strength, locked: gammaLocked },
+    right: { strength: state.left.strength, locked: gammaLocked },
   }
 }
 
 const MIN_HINT_DELTA_DEG = 2
+const AXIS_LOCK_DEG = 5
 
-function hintIntensity(delta: number, tolerance: number): number {
+/** Farther from target → higher strength (bigger arrow). */
+function directionalStrength(delta: number, tolerance: number): number {
   const magnitude = Math.abs(delta)
-  if (magnitude < MIN_HINT_DELTA_DEG) {
+  if (magnitude <= MIN_HINT_DELTA_DEG) {
     return 0
   }
 
-  return Math.min(1, Math.max(0.35, magnitude / tolerance))
+  const t = Math.min(1, magnitude / Math.max(tolerance, 1))
+  return 0.35 + 0.65 * t
 }
 
 /**
  * Edge arrows show which way to lean the phone (not the correction vector).
  * Up arrow → tilt the top of the phone toward the top of the screen / ceiling.
  */
-export function computeTiltHints(
+export function computeTiltHintState(
   reading: OrientationReading,
   target: OrientationTarget,
   tolerance: number,
-): TiltHints {
-  const hidden = { top: 0, right: 0, bottom: 0, left: 0 }
-
+): TiltHintsState {
   if (reading.beta === null || reading.gamma === null) {
-    return hidden
+    return {
+      top: { ...EMPTY_SIDE },
+      right: { ...EMPTY_SIDE },
+      bottom: { ...EMPTY_SIDE },
+      left: { ...EMPTY_SIDE },
+    }
   }
 
   const betaCorrection = normalizeAngleDelta(target.beta, reading.beta)
   const gammaCorrection = normalizeAngleDelta(target.gamma, reading.gamma)
+  const lockThreshold = Math.max(AXIS_LOCK_DEG, tolerance * 0.1)
+  const betaLocked = Math.abs(betaCorrection) <= lockThreshold
+  const gammaLocked = Math.abs(gammaCorrection) <= lockThreshold
 
   return {
-    top: betaCorrection < -MIN_HINT_DELTA_DEG ? hintIntensity(betaCorrection, tolerance) : 0,
-    bottom: betaCorrection > MIN_HINT_DELTA_DEG ? hintIntensity(betaCorrection, tolerance) : 0,
-    left: gammaCorrection < -MIN_HINT_DELTA_DEG ? hintIntensity(gammaCorrection, tolerance) : 0,
-    right: gammaCorrection > MIN_HINT_DELTA_DEG ? hintIntensity(gammaCorrection, tolerance) : 0,
+    top: {
+      strength:
+        betaLocked || betaCorrection >= -MIN_HINT_DELTA_DEG
+          ? 0
+          : directionalStrength(betaCorrection, tolerance),
+      locked: betaLocked,
+    },
+    bottom: {
+      strength:
+        betaLocked || betaCorrection <= MIN_HINT_DELTA_DEG
+          ? 0
+          : directionalStrength(betaCorrection, tolerance),
+      locked: betaLocked,
+    },
+    left: {
+      strength:
+        gammaLocked || gammaCorrection >= -MIN_HINT_DELTA_DEG
+          ? 0
+          : directionalStrength(gammaCorrection, tolerance),
+      locked: gammaLocked,
+    },
+    right: {
+      strength:
+        gammaLocked || gammaCorrection <= MIN_HINT_DELTA_DEG
+          ? 0
+          : directionalStrength(gammaCorrection, tolerance),
+      locked: gammaLocked,
+    },
   }
 }

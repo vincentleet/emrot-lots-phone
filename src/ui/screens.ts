@@ -2,9 +2,11 @@ import { puzzles } from '../config/puzzles'
 import { albumThumbUrl } from '../lib/assets'
 import type { OrientationReading } from '../config/types'
 import {
-  computeTiltHints,
-  invertTiltHints,
+  computeTiltHintState,
+  invertTiltHintState,
   isAndroidDevice,
+  tiltHintLabel,
+  type TiltHintSideState,
   formatOrientation,
   formatTarget,
   OrientationManager,
@@ -188,19 +190,6 @@ export class App {
     })
   }
 
-  private attachSensorRetry(container: HTMLElement): void {
-    const badge = container.querySelector('[data-sensor-badge]') as HTMLElement | null
-    if (!badge) {
-      return
-    }
-
-    badge.addEventListener('click', (event) => {
-      event.preventDefault()
-      event.stopPropagation()
-      void this.ensureSensors()
-    })
-  }
-
   private async ensureSensors(): Promise<boolean> {
     if (this.sensorsReady) {
       return true
@@ -268,10 +257,18 @@ export class App {
               ${numberLayer}
             </div>
             <div class="tilt-hints" aria-hidden="true">
-              <span class="tilt-hint tilt-hint--top" data-tilt-hint="top"></span>
-              <span class="tilt-hint tilt-hint--right" data-tilt-hint="right"></span>
-              <span class="tilt-hint tilt-hint--bottom" data-tilt-hint="bottom"></span>
-              <span class="tilt-hint tilt-hint--left" data-tilt-hint="left"></span>
+              <span class="tilt-hint tilt-hint--top" data-tilt-hint="top" data-tilt-label="${tiltHintLabel('top')}">
+                <span class="tilt-hint-label">${tiltHintLabel('top')}</span>
+              </span>
+              <span class="tilt-hint tilt-hint--right" data-tilt-hint="right" data-tilt-label="${tiltHintLabel('right')}">
+                <span class="tilt-hint-label">${tiltHintLabel('right')}</span>
+              </span>
+              <span class="tilt-hint tilt-hint--bottom" data-tilt-hint="bottom" data-tilt-label="${tiltHintLabel('bottom')}">
+                <span class="tilt-hint-label">${tiltHintLabel('bottom')}</span>
+              </span>
+              <span class="tilt-hint tilt-hint--left" data-tilt-hint="left" data-tilt-label="${tiltHintLabel('left')}">
+                <span class="tilt-hint-label">${tiltHintLabel('left')}</span>
+              </span>
             </div>
           </article>
         `
@@ -294,7 +291,6 @@ export class App {
           <span>Album</span>
         </button>
         <span class="photos-toolbar-title" data-photo-counter>${this.puzzleIndex + 1} / ${puzzles.length}</span>
-        <span class="sensor-badge" data-sensor-badge aria-live="polite">Sensors: …</span>
       </header>
       <div class="photos-viewport" data-gallery-viewport>
         <div class="photos-track" data-gallery-track>
@@ -324,7 +320,6 @@ export class App {
 
     this.attachCalibrationTrigger(container)
     this.attachBackToGrid(container)
-    this.attachSensorRetry(container)
     this.root.append(container)
     this.updateGalleryTransform(false)
     this.startGalleryLoop(container)
@@ -368,31 +363,6 @@ export class App {
       counter.textContent = `${this.puzzleIndex + 1} / ${puzzles.length}`
     }
 
-    const badge = this.galleryContainer.querySelector('[data-sensor-badge]') as HTMLElement | null
-    if (badge) {
-      const isSecure = this.orientation.isSecureContext
-      const lastEvent = this.orientation.lastEventName ?? 'none'
-      const ageMs = this.orientation.lastReadingAtMs === null ? null : Date.now() - this.orientation.lastReadingAtMs
-      const ageText = ageMs === null ? 'never' : `${Math.round(ageMs / 100) / 10}s`
-      const beta = this.latestReading.beta
-      const gamma = this.latestReading.gamma
-      const hasAngles = beta !== null || gamma !== null
-      const anglesText = hasAngles
-        ? `β${beta === null ? '—' : Math.round(beta)} γ${gamma === null ? '—' : Math.round(gamma)}`
-        : 'β— γ—'
-
-      const sensorState = this.sensorsReady ? 'on' : this.sensorsRequestInFlight ? 'requesting' : 'off'
-      const sourceLabel =
-        this.orientation.sensorSource === 'motion'
-          ? 'accel'
-          : this.orientation.sensorSource === 'orientation'
-            ? 'gyro'
-            : '—'
-      const hint = sensorState === 'off' ? 'tap to retry' : ''
-      badge.textContent = `Sensors: ${sensorState} · ${sourceLabel} · ${isSecure ? 'https' : 'not-https'} · ${String(lastEvent)} · ${ageText} · ${anglesText}${hint ? ` · ${hint}` : ''}`
-      badge.dataset.state = this.sensorsReady && hasAngles ? 'ok' : sensorState === 'requesting' ? 'pending' : 'bad'
-    }
-
     this.galleryContainer.classList.toggle(
       'gallery-screen--accel',
       this.orientation.sensorSource === 'motion',
@@ -424,8 +394,7 @@ export class App {
             numberLayer.style.opacity = '0'
           }
           for (const element of hintElements) {
-            element.style.opacity = '0'
-            element.classList.remove('is-active')
+            this.applyTiltHintElement(element, { strength: 0, locked: false })
           }
           return
         }
@@ -475,20 +444,18 @@ export class App {
             puzzle.car.tolerance,
             puzzle.number?.tolerance,
           )
-          let hints = computeTiltHints(this.latestReading, puzzle.target, hintTolerance)
+          let hintState = computeTiltHintState(this.latestReading, puzzle.target, hintTolerance)
           if (isAndroidDevice()) {
-            hints = invertTiltHints(hints)
+            hintState = invertTiltHintState(hintState)
           }
           for (const element of hintElements) {
-            const side = element.dataset.tiltHint as keyof typeof hints | undefined
-            const strength = side ? hints[side] : 0
-            element.style.opacity = String(strength)
-            element.classList.toggle('is-active', strength > 0)
+            const side = element.dataset.tiltHint as keyof typeof hintState | undefined
+            const sideState: TiltHintSideState = side ? hintState[side] : { strength: 0, locked: false }
+            this.applyTiltHintElement(element, sideState)
           }
         } else if (isActive) {
           for (const element of hintElements) {
-            element.style.opacity = '0'
-            element.classList.remove('is-active')
+            this.applyTiltHintElement(element, { strength: 0, locked: false })
           }
         }
 
@@ -505,8 +472,7 @@ export class App {
             numberLayer.style.opacity = '1'
           }
           for (const element of hintElements) {
-            element.style.opacity = '0'
-            element.classList.remove('is-active')
+            this.applyTiltHintElement(element, { strength: 0, locked: false })
           }
           this.updateGalleryChrome()
         }
@@ -516,6 +482,39 @@ export class App {
     }
 
     this.rafId = window.requestAnimationFrame(tick)
+  }
+
+  private applyTiltHintElement(element: HTMLElement, state: TiltHintSideState): void {
+    const label = element.querySelector('.tilt-hint-label')
+    const defaultLabel = element.dataset.tiltLabel ?? ''
+
+    if (state.locked) {
+      if (label) {
+        label.textContent = '✓'
+      }
+      element.style.setProperty('--hint-scale', '0.88')
+      element.style.opacity = '1'
+      element.classList.add('is-axis-locked')
+      element.classList.remove('is-active')
+      return
+    }
+
+    element.classList.remove('is-axis-locked')
+    if (label) {
+      label.textContent = defaultLabel
+    }
+
+    if (state.strength <= 0) {
+      element.style.setProperty('--hint-scale', '0')
+      element.style.opacity = '0'
+      element.classList.remove('is-active')
+      return
+    }
+
+    const scale = 0.55 + 0.45 * state.strength
+    element.style.setProperty('--hint-scale', String(scale))
+    element.style.opacity = String(0.3 + 0.7 * state.strength)
+    element.classList.toggle('is-active', state.strength > 0.55)
   }
 
   private stopGalleryLoop(): void {

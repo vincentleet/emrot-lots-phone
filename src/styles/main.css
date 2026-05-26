@@ -229,7 +229,7 @@ body {
   z-index: 3;
   flex: 0 0 auto;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr;
   align-items: center;
   gap: 0.25rem;
   min-height: 3.5rem;
@@ -307,39 +307,6 @@ body {
   font-weight: 500;
   letter-spacing: 0.01em;
   text-align: center;
-}
-
-.sensor-badge {
-  justify-self: end;
-  max-width: min(64vw, 30rem);
-  padding: 0.25rem 0.55rem;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--md-sys-color-on-surface-variant);
-  font-size: 0.7rem;
-  line-height: 1.1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  cursor: pointer;
-  user-select: none;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.sensor-badge[data-state='ok'] {
-  border-color: rgba(168, 199, 250, 0.35);
-  color: var(--md-sys-color-primary);
-}
-
-.sensor-badge[data-state='pending'] {
-  border-color: rgba(255, 255, 255, 0.22);
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.sensor-badge[data-state='bad'] {
-  border-color: rgba(255, 255, 255, 0.18);
-  color: rgba(255, 255, 255, 0.75);
 }
 
 .photos-viewport {
@@ -451,55 +418,64 @@ body {
 }
 
 .tilt-hint {
+  --hint-scale: 0;
   position: absolute;
-  width: 3rem;
-  height: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  min-width: 4.75rem;
+  height: auto;
+  padding: 0.4rem 0.7rem;
   opacity: 0;
-  transition: opacity 0.15s ease-out;
+  transition:
+    opacity 0.12s ease-out,
+    transform 0.12s ease-out;
 }
 
-/* Semi-transparent disc behind the arrow */
 .tilt-hint::before {
   content: '';
   position: absolute;
   inset: 0;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
-  transform: scale(0.92);
-  opacity: 0;
-  transition: opacity 0.15s ease-out;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  opacity: 0.9;
+  transition: background 0.15s ease-out;
 }
 
 .tilt-hint.is-active::before {
-  opacity: 1;
   animation: tilt-hint-ring 2s ease-out infinite;
 }
 
-.tilt-hint::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  margin: auto;
-  width: 0.8rem;
-  height: 0.8rem;
-  border-top: 2.5px solid rgba(255, 255, 255, 0.95);
-  border-right: 2.5px solid rgba(255, 255, 255, 0.95);
-  border-radius: 1px;
-  filter: drop-shadow(0 1px 5px rgba(0, 0, 0, 0.55));
+.tilt-hint-label {
+  position: relative;
+  z-index: 1;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  line-height: 1.1;
+  color: rgba(255, 255, 255, 0.96);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.65);
+  white-space: nowrap;
+  pointer-events: none;
 }
 
-.tilt-hint.is-active::after {
-  animation: tilt-arrow-glow 1.8s ease-in-out infinite;
+.tilt-hint.is-axis-locked::before {
+  background: rgba(168, 199, 250, 0.22);
+  border-color: rgba(168, 199, 250, 0.45);
+  animation: none;
+}
+
+.tilt-hint.is-axis-locked .tilt-hint-label {
+  font-size: 1rem;
+  color: var(--md-sys-color-primary);
 }
 
 .tilt-hint--top {
   top: 0.65rem;
   left: 50%;
-  transform: translateX(-50%);
-}
-
-.tilt-hint--top::after {
-  transform: rotate(-45deg);
+  transform: translateX(-50%) scale(var(--hint-scale));
 }
 
 .tilt-hint--top.is-active {
@@ -509,11 +485,12 @@ body {
 .tilt-hint--right {
   top: 50%;
   right: 0.65rem;
-  transform: translateY(-50%);
+  transform: translateY(-50%) scale(var(--hint-scale));
 }
 
-.tilt-hint--right::after {
-  transform: rotate(45deg);
+.tilt-hint--right {
+  min-width: 4.25rem;
+  padding: 0.35rem 0.55rem;
 }
 
 .tilt-hint--right.is-active {
@@ -523,11 +500,7 @@ body {
 .tilt-hint--bottom {
   bottom: 0.65rem;
   left: 50%;
-  transform: translateX(-50%);
-}
-
-.tilt-hint--bottom::after {
-  transform: rotate(135deg);
+  transform: translateX(-50%) scale(var(--hint-scale));
 }
 
 .tilt-hint--bottom.is-active {
@@ -537,15 +510,20 @@ body {
 .tilt-hint--left {
   top: 50%;
   left: 0.65rem;
-  transform: translateY(-50%);
+  transform: translateY(-50%) scale(var(--hint-scale));
 }
 
-.tilt-hint--left::after {
-  transform: rotate(-135deg);
+.tilt-hint--left {
+  min-width: 4.25rem;
+  padding: 0.35rem 0.55rem;
 }
 
 .tilt-hint--left.is-active {
   animation: tilt-hint-nudge-left 2.4s ease-in-out infinite;
+}
+
+.tilt-hint.is-axis-locked {
+  animation: none;
 }
 
 @keyframes tilt-hint-ring {
@@ -568,58 +546,47 @@ body {
   }
 }
 
-@keyframes tilt-arrow-glow {
-  0%,
-  100% {
-    opacity: 0.78;
-  }
-
-  50% {
-    opacity: 1;
-  }
-}
-
 @keyframes tilt-hint-nudge-top {
   0%,
   100% {
-    transform: translateX(-50%) translateY(0);
+    transform: translateX(-50%) scale(var(--hint-scale)) translateY(0);
   }
 
   50% {
-    transform: translateX(-50%) translateY(-5px);
+    transform: translateX(-50%) scale(var(--hint-scale)) translateY(-5px);
   }
 }
 
 @keyframes tilt-hint-nudge-bottom {
   0%,
   100% {
-    transform: translateX(-50%) translateY(0);
+    transform: translateX(-50%) scale(var(--hint-scale)) translateY(0);
   }
 
   50% {
-    transform: translateX(-50%) translateY(5px);
+    transform: translateX(-50%) scale(var(--hint-scale)) translateY(5px);
   }
 }
 
 @keyframes tilt-hint-nudge-left {
   0%,
   100% {
-    transform: translateY(-50%) translateX(0);
+    transform: translateY(-50%) scale(var(--hint-scale)) translateX(0);
   }
 
   50% {
-    transform: translateY(-50%) translateX(-5px);
+    transform: translateY(-50%) scale(var(--hint-scale)) translateX(-5px);
   }
 }
 
 @keyframes tilt-hint-nudge-right {
   0%,
   100% {
-    transform: translateY(-50%) translateX(0);
+    transform: translateY(-50%) scale(var(--hint-scale)) translateX(0);
   }
 
   50% {
-    transform: translateY(-50%) translateX(5px);
+    transform: translateY(-50%) scale(var(--hint-scale)) translateX(5px);
   }
 }
 
