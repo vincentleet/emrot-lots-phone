@@ -94,7 +94,8 @@ export function hintToleranceForDistance(
   return numberTolerance
 }
 
-const OPACITY_LERP = 0.2
+const OPACITY_LERP_GYRO = 0.2
+const OPACITY_LERP_ACCEL = 0.55
 
 export interface SmoothedLayerOpacity {
   car: number
@@ -106,6 +107,7 @@ export function lerpLayerOpacity(
   current: SmoothedLayerOpacity,
   target: SmoothedLayerOpacity,
   hasReading: boolean,
+  lerp = OPACITY_LERP_GYRO,
 ): SmoothedLayerOpacity {
   if (!hasReading) {
     return {
@@ -115,7 +117,11 @@ export function lerpLayerOpacity(
   }
 
   return {
-    car: current.car + (target.car - current.car) * OPACITY_LERP,
-    number: current.number + (target.number - current.number) * OPACITY_LERP,
+    car: current.car + (target.car - current.car) * lerp,
+    number: current.number + (target.number - current.number) * lerp,
   }
+}
+
+export function opacityLerpForSensorSource(source: 'orientation' | 'motion' | null): number {
+  return source === 'motion' ? OPACITY_LERP_ACCEL : OPACITY_LERP_GYRO
 }

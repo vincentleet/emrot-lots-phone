@@ -1,6 +1,5 @@
 import { puzzles } from '../config/puzzles'
 import type { OrientationReading } from '../config/types'
-import { compareDigitOrder, hasNumberLayer } from '../lib/puzzle'
 import {
   computeTiltHints,
   formatOrientation,
@@ -12,13 +11,14 @@ import {
   hintToleranceForDistance,
   isDigitFound,
   lerpLayerOpacity,
+  opacityLerpForSensorSource,
   type SmoothedLayerOpacity,
 } from '../lib/reveal'
 import { ProximityHaptics } from '../lib/haptics'
 import { releaseWakeLock, requestWakeLock } from '../lib/wakeLock'
 import { attachGallerySwipe } from './gallery'
 
-type Screen = 'grid' | 'gallery' | 'summary' | 'calibrate'
+type Screen = 'grid' | 'gallery' | 'calibrate'
 
 const CALIBRATION_TAP_COUNT = 5
 const CALIBRATION_TAP_WINDOW_MS = 2000
@@ -51,12 +51,6 @@ export class App {
     this.render()
   }
 
-  private allCodeSlidesLocked(): boolean {
-    return puzzles.every(
-      (puzzle, index) => !hasNumberLayer(puzzle) || this.slideLocked[index],
-    )
-  }
-
   private setScreen(screen: Screen): void {
     this.stopGalleryLoop()
     this.proximityHaptics.reset()
@@ -79,9 +73,6 @@ export class App {
         break
       case 'gallery':
         this.renderGallery()
-        break
-      case 'summary':
-        this.renderSummary()
         break
       case 'calibrate':
         this.renderCalibrate()
@@ -276,17 +267,6 @@ export class App {
         </button>
         <span class="photos-toolbar-title" data-photo-counter>${this.puzzleIndex + 1} / ${puzzles.length}</span>
         <span class="sensor-badge" data-sensor-badge aria-live="polite">Sensors: …</span>
-        <button
-          type="button"
-          class="photos-toolbar-btn photos-toolbar-btn--icon"
-          data-action="view-code"
-          aria-label="View recovered code"
-          ${this.allCodeSlidesLocked() ? '' : 'hidden'}
-        >
-          <svg class="photos-toolbar-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
-          </svg>
-        </button>
       </header>
       <div class="photos-viewport" data-gallery-viewport>
         <div class="photos-track" data-gallery-track>
@@ -374,15 +354,21 @@ export class App {
         : 'β— γ—'
 
       const sensorState = this.sensorsReady ? 'on' : this.sensorsRequestInFlight ? 'requesting' : 'off'
+      const sourceLabel =
+        this.orientation.sensorSource === 'motion'
+          ? 'accel'
+          : this.orientation.sensorSource === 'orientation'
+            ? 'gyro'
+            : '—'
       const hint = sensorState === 'off' ? 'tap to retry' : ''
-      badge.textContent = `Sensors: ${sensorState} · ${isSecure ? 'https' : 'not-https'} · ${String(lastEvent)} · ${ageText} · ${anglesText}${hint ? ` · ${hint}` : ''}`
+      badge.textContent = `Sensors: ${sensorState} · ${sourceLabel} · ${isSecure ? 'https' : 'not-https'} · ${String(lastEvent)} · ${ageText} · ${anglesText}${hint ? ` · ${hint}` : ''}`
       badge.dataset.state = this.sensorsReady && hasAngles ? 'ok' : sensorState === 'requesting' ? 'pending' : 'bad'
     }
 
-    const codeButton = this.galleryContainer.querySelector('[data-action="view-code"]') as HTMLElement | null
-    if (codeButton) {
-      codeButton.hidden = !this.allCodeSlidesLocked()
-    }
+    this.galleryContainer.classList.toggle(
+      'gallery-screen--accel',
+      this.orientation.sensorSource === 'motion',
+    )
 
     const dots = this.galleryContainer.querySelectorAll('[data-photo-dot]')
     dots.forEach((dot, index) => {
@@ -428,10 +414,12 @@ export class App {
         )
 
         const hasReading = distance !== null
+        const opacityLerp = opacityLerpForSensorSource(this.orientation.sensorSource)
         this.smoothedOpacity[index] = lerpLayerOpacity(
           this.smoothedOpacity[index],
           { car, number },
           hasReading,
+          opacityLerp,
         )
         const displayCar = this.slideLocked[index] ? 1 : this.smoothedOpacity[index].car
         const displayNumber = this.slideLocked[index] ? 1 : this.smoothedOpacity[index].number
@@ -507,31 +495,6 @@ export class App {
     this.proximityHaptics.cancel()
   }
 
-  private renderSummary(): void {
-    void this.releaseWakeLock()
-
-    const container = this.createScreen('summary-screen')
-    const code = puzzles
-      .filter(hasNumberLayer)
-      .sort(compareDigitOrder)
-      .map((puzzle) => puzzle.digit)
-      .join('-')
-
-    container.innerHTML = `
-      <div class="sheet-backdrop" data-action="close-summary"></div>
-      <div class="info-sheet" role="dialog" aria-labelledby="sheet-title">
-        <div class="info-sheet-handle" aria-hidden="true"></div>
-        <h2 id="sheet-title" class="info-sheet-title">Photo information</h2>
-        <p class="info-sheet-label">Recovered code</p>
-        <p class="code-display">${code}</p>
-        <button type="button" class="btn btn-photos" data-action="close-summary">Done</button>
-      </div>
-    `
-
-    this.attachCalibrationTrigger(container)
-    this.root.append(container)
-  }
-
   private renderCalibrate(): void {
     const container = this.createScreen('calibrate-screen')
 
@@ -569,7 +532,7 @@ export class App {
 
     container.querySelector('[data-action="exit-calibrate"]')?.addEventListener('click', () => {
       const nextScreen = this.returnScreen
-      this.setScreen(nextScreen === 'summary' ? 'gallery' : nextScreen)
+      this.setScreen(nextScreen)
       if (nextScreen === 'gallery') {
         void this.acquireWakeLock()
       }
@@ -680,17 +643,6 @@ export class App {
 
       if (action === 'back-to-grid') {
         this.setScreen('grid')
-        return
-      }
-
-      if (action === 'view-code') {
-        this.setScreen('summary')
-        return
-      }
-
-      if (action === 'close-summary') {
-        this.setScreen('gallery')
-        void this.acquireWakeLock()
       }
     })
   }

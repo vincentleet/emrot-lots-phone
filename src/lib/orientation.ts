@@ -2,6 +2,8 @@ import type { OrientationReading, OrientationTarget } from '../config/types'
 
 type OrientationListener = (reading: OrientationReading) => void
 
+export type SensorSource = 'orientation' | 'motion' | null
+
 interface DeviceOrientationEventConstructorWithPermission {
   requestPermission?: () => Promise<'granted' | 'denied'>
 }
@@ -10,6 +12,10 @@ const ORIENTATION_EVENTS = ['deviceorientation', 'deviceorientationabsolute'] as
 const MOTION_EVENT = 'devicemotion' as const
 type OrientationEventName = (typeof ORIENTATION_EVENTS)[number] | typeof MOTION_EVENT
 const ORIENTATION_STALE_MS = 900
+
+function hasUsableAngles(reading: OrientationReading): boolean {
+  return reading.beta !== null && reading.gamma !== null
+}
 
 function deriveReadingFromMotion(event: DeviceMotionEvent): OrientationReading | null {
   const gravity = event.accelerationIncludingGravity
@@ -24,10 +30,10 @@ function deriveReadingFromMotion(event: DeviceMotionEvent): OrientationReading |
     return null
   }
 
-  // Accelerometer fallback for devices that never emit deviceorientation.
-  // This gives stable pseudo beta/gamma values from gravity vector.
-  const beta = (Math.atan2(-x, Math.sqrt(y * y + z * z)) * 180) / Math.PI
-  const gamma = (Math.atan2(y, z) * 180) / Math.PI
+  // Accelerometer fallback when deviceorientation is unavailable.
+  // Uses gravity vector (tilt), not gyro integration — feels slightly different from iOS gyro.
+  const beta = (Math.atan2(-x, Math.hypot(y, z)) * 180) / Math.PI
+  const gamma = (Math.atan2(y, Math.hypot(x, z)) * 180) / Math.PI
   return { beta, gamma, alpha: null }
 }
 
@@ -35,6 +41,8 @@ export class OrientationManager {
   private listener: OrientationListener | null = null
   private lastEvent: OrientationEventName | null = null
   private lastReadingMs: number | null = null
+  private lastOrientationMs: number | null = null
+  private source: SensorSource = null
   private handlers: Partial<Record<OrientationEventName, (event: DeviceOrientationEvent) => void>> =
     {}
 
@@ -48,6 +56,10 @@ export class OrientationManager {
 
   get lastReadingAtMs(): number | null {
     return this.lastReadingMs
+  }
+
+  get sensorSource(): SensorSource {
+    return this.source
   }
 
   async requestAccess(): Promise<boolean> {
@@ -67,13 +79,20 @@ export class OrientationManager {
     this.listener = listener
     for (const eventName of ORIENTATION_EVENTS) {
       const handler = (event: DeviceOrientationEvent) => {
-        this.lastEvent = eventName
-        this.lastReadingMs = Date.now()
-        this.listener?.({
+        const reading: OrientationReading = {
           beta: event.beta,
           gamma: event.gamma,
           alpha: event.alpha,
-        })
+        }
+        if (!hasUsableAngles(reading)) {
+          return
+        }
+
+        this.lastEvent = eventName
+        this.lastReadingMs = Date.now()
+        this.lastOrientationMs = this.lastReadingMs
+        this.source = 'orientation'
+        this.listener?.(reading)
       }
       this.handlers[eventName] = handler
       window.addEventListener(eventName, handler as EventListener)
@@ -81,7 +100,8 @@ export class OrientationManager {
 
     const motionHandler = (event: DeviceMotionEvent) => {
       const now = Date.now()
-      const orientationIsFresh = this.lastReadingMs !== null && now - this.lastReadingMs < ORIENTATION_STALE_MS
+      const orientationIsFresh =
+        this.lastOrientationMs !== null && now - this.lastOrientationMs < ORIENTATION_STALE_MS
       if (orientationIsFresh) {
         return
       }
@@ -93,6 +113,7 @@ export class OrientationManager {
 
       this.lastEvent = MOTION_EVENT
       this.lastReadingMs = now
+      this.source = 'motion'
       this.listener?.(reading)
     }
     this.handlers[MOTION_EVENT] = motionHandler as unknown as (event: DeviceOrientationEvent) => void
@@ -108,6 +129,8 @@ export class OrientationManager {
     }
     this.listener = null
     this.handlers = {}
+    this.source = null
+    this.lastOrientationMs = null
   }
 
   private waitForFirstReading(timeoutMs: number): Promise<boolean> {
@@ -115,8 +138,6 @@ export class OrientationManager {
       let resolved = false
 
       const handler = (event: DeviceOrientationEvent) => {
-        // Some Android/Chrome variants only populate certain fields and/or only
-        // emit on `deviceorientationabsolute`.
         if (event.beta === null && event.gamma === null && event.alpha === null) {
           return
         }
@@ -127,6 +148,7 @@ export class OrientationManager {
         for (const eventName of ORIENTATION_EVENTS) {
           window.removeEventListener(eventName, handler as EventListener)
         }
+        window.removeEventListener(MOTION_EVENT, motionHandler as EventListener)
         clearTimeout(timer)
         resolve(true)
       }
