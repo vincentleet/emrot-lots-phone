@@ -7,7 +7,30 @@ interface DeviceOrientationEventConstructorWithPermission {
 }
 
 const ORIENTATION_EVENTS = ['deviceorientation', 'deviceorientationabsolute'] as const
-type OrientationEventName = (typeof ORIENTATION_EVENTS)[number]
+const MOTION_EVENT = 'devicemotion' as const
+type OrientationEventName = (typeof ORIENTATION_EVENTS)[number] | typeof MOTION_EVENT
+const ORIENTATION_STALE_MS = 900
+
+function deriveReadingFromMotion(event: DeviceMotionEvent): OrientationReading | null {
+  const gravity = event.accelerationIncludingGravity
+  if (!gravity) {
+    return null
+  }
+
+  const x = gravity.x ?? null
+  const y = gravity.y ?? null
+  const z = gravity.z ?? null
+  if (x === null || y === null || z === null) {
+    return null
+  }
+
+  // Accelerometer fallback for devices that never emit deviceorientation.
+  // This gives stable pseudo beta/gamma values from gravity vector.
+  const beta = (Math.atan2(-x, Math.sqrt(y * y + z * z)) * 180) / Math.PI
+  const gamma = (Math.atan2(y, z) * 180) / Math.PI
+  return { beta, gamma, alpha: null }
+}
+
 export class OrientationManager {
   private listener: OrientationListener | null = null
   private lastEvent: OrientationEventName | null = null
@@ -55,10 +78,29 @@ export class OrientationManager {
       this.handlers[eventName] = handler
       window.addEventListener(eventName, handler as EventListener)
     }
+
+    const motionHandler = (event: DeviceMotionEvent) => {
+      const now = Date.now()
+      const orientationIsFresh = this.lastReadingMs !== null && now - this.lastReadingMs < ORIENTATION_STALE_MS
+      if (orientationIsFresh) {
+        return
+      }
+
+      const reading = deriveReadingFromMotion(event)
+      if (!reading) {
+        return
+      }
+
+      this.lastEvent = MOTION_EVENT
+      this.lastReadingMs = now
+      this.listener?.(reading)
+    }
+    this.handlers[MOTION_EVENT] = motionHandler as unknown as (event: DeviceOrientationEvent) => void
+    window.addEventListener(MOTION_EVENT, motionHandler as EventListener)
   }
 
   stop(): void {
-    for (const eventName of ORIENTATION_EVENTS) {
+    for (const eventName of [...ORIENTATION_EVENTS, MOTION_EVENT] as const) {
       const handler = this.handlers[eventName]
       if (handler) {
         window.removeEventListener(eventName, handler as EventListener)
@@ -89,6 +131,22 @@ export class OrientationManager {
         resolve(true)
       }
 
+      const motionHandler = (event: DeviceMotionEvent) => {
+        if (resolved) {
+          return
+        }
+        if (!deriveReadingFromMotion(event)) {
+          return
+        }
+        resolved = true
+        for (const eventName of ORIENTATION_EVENTS) {
+          window.removeEventListener(eventName, handler as EventListener)
+        }
+        window.removeEventListener(MOTION_EVENT, motionHandler as EventListener)
+        clearTimeout(timer)
+        resolve(true)
+      }
+
       const timer = window.setTimeout(() => {
         if (resolved) {
           return
@@ -97,12 +155,14 @@ export class OrientationManager {
         for (const eventName of ORIENTATION_EVENTS) {
           window.removeEventListener(eventName, handler as EventListener)
         }
+        window.removeEventListener(MOTION_EVENT, motionHandler as EventListener)
         resolve(false)
       }, timeoutMs)
 
       for (const eventName of ORIENTATION_EVENTS) {
         window.addEventListener(eventName, handler as EventListener)
       }
+      window.addEventListener(MOTION_EVENT, motionHandler as EventListener)
     })
   }
 }
