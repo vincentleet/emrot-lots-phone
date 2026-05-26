@@ -6,8 +6,8 @@ type PuzzleDraft = Omit<Puzzle, 'id'>
 
 /** Wide zone: car image fades in over a large tilt range. */
 const CAR_TOLERANCE = 72
-/** Wider sweet spot for locking the digit angle. */
-const NUMBER_TOLERANCE = 22
+/** Digit snaps on fully anywhere inside this zone (no fade). */
+const NUMBER_TOLERANCE = 14
 
 /**
  * Key = car number from filename (car1.png → 1).

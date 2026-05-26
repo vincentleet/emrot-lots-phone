@@ -381,6 +381,24 @@ body {
   opacity: 1;
 }
 
+.photos-image--number.is-number-flash {
+  animation: number-reveal-flash 0.6s ease-out;
+}
+
+@keyframes number-reveal-flash {
+  0% {
+    filter: brightness(3) saturate(0.2);
+  }
+
+  35% {
+    filter: brightness(2.2) saturate(0.5);
+  }
+
+  100% {
+    filter: none;
+  }
+}
+
 .photos-chrome {
   z-index: 3;
   flex: 0 0 auto;

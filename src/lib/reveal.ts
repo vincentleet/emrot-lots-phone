@@ -67,6 +67,25 @@ export function isWithinCarRevealRange(
   return distance < carTolerance * FADE_TAIL_RATIO
 }
 
+/** Number layer: full opacity anywhere inside tolerance, hidden outside (no gradient). */
+export function numberOpacityFromDistance(
+  distance: number | null,
+  numberTolerance: number,
+): number {
+  if (distance === null) {
+    return 0
+  }
+
+  return distance <= numberTolerance ? 1 : 0
+}
+
+export function isWithinNumberRevealRange(
+  distance: number | null,
+  numberTolerance: number,
+): boolean {
+  return numberOpacityFromDistance(distance, numberTolerance) === 1
+}
+
 export function computeDualRevealOpacity(
   reading: OrientationReading,
   target: OrientationTarget,
@@ -79,7 +98,7 @@ export function computeDualRevealOpacity(
     number:
       numberTolerance === undefined
         ? 0
-        : opacityFromDistance(distance, numberTolerance),
+        : numberOpacityFromDistance(distance, numberTolerance),
     distance,
   }
 }
@@ -127,10 +146,17 @@ export function lerpLayerOpacity(
     }
   }
 
-  return {
-    car: current.car + (target.car - current.car) * lerp,
-    number: current.number + (target.number - current.number) * lerp,
+  const car = current.car + (target.car - current.car) * lerp
+  let number: number
+  if (target.number >= 1) {
+    number = 1
+  } else if (!hasReading) {
+    number = current.number * 0.9
+  } else {
+    number = current.number + (target.number - current.number) * Math.min(1, lerp * 2.5)
   }
+
+  return { car, number }
 }
 
 export function opacityLerpForSensorSource(source: 'orientation' | 'motion' | null): number {

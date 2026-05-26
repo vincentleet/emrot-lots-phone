@@ -59,6 +59,7 @@ export class App {
   private proximityHaptics = new ProximityHaptics()
   private preloadCache = new Map<string, Promise<void>>()
   private sensorPermissionOverlay: HTMLElement | null = null
+  private numberInRangePrev: boolean[] = puzzles.map(() => false)
 
   constructor(root: HTMLElement) {
     this.root = root
@@ -304,6 +305,7 @@ export class App {
 
     this.puzzleIndex = index
     this.smoothedOpacity[index] = { car: 0, number: 0 }
+    this.numberInRangePrev[index] = false
     this.setScreen('gallery')
     void this.acquireWakeLock()
 
@@ -454,6 +456,8 @@ export class App {
       return
     }
 
+    this.numberInRangePrev[index] = false
+
     if (!this.sensorsReady) {
       this.smoothedOpacity[index] = { car: 0, number: 0 }
       return
@@ -597,6 +601,9 @@ export class App {
       }
       if (numberLayer) {
         numberLayer.style.opacity = String(displayNumber)
+        if (puzzle.number && !this.slideLocked[index]) {
+          this.updateNumberRevealFlash(numberLayer, index, displayNumber >= 1)
+        }
       }
 
       if (isActive && this.sensorsReady) {
@@ -673,6 +680,24 @@ export class App {
     }
 
     this.rafId = window.requestAnimationFrame(tick)
+  }
+
+  private updateNumberRevealFlash(
+    numberLayer: HTMLElement,
+    index: number,
+    inRange: boolean,
+  ): void {
+    if (inRange && !this.numberInRangePrev[index]) {
+      numberLayer.classList.remove('is-number-flash')
+      void numberLayer.offsetWidth
+      numberLayer.classList.add('is-number-flash')
+    }
+
+    if (!inRange) {
+      numberLayer.classList.remove('is-number-flash')
+    }
+
+    this.numberInRangePrev[index] = inRange
   }
 
   private applyTiltHintElement(element: HTMLElement, state: TiltHintSideState): void {
