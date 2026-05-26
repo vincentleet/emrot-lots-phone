@@ -56,6 +56,17 @@ export function carOpacityFromDistance(
   return opacityFromDistance(distance, carTolerance)
 }
 
+export function isWithinCarRevealRange(
+  distance: number | null,
+  carTolerance: number,
+): boolean {
+  if (distance === null) {
+    return false
+  }
+
+  return distance < carTolerance * FADE_TAIL_RATIO
+}
+
 export function computeDualRevealOpacity(
   reading: OrientationReading,
   target: OrientationTarget,

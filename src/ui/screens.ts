@@ -16,11 +16,18 @@ import {
   computeDualRevealOpacity,
   hintToleranceForDistance,
   isDigitFound,
+  isWithinCarRevealRange,
   lerpLayerOpacity,
   opacityLerpForSensorSource,
+  type DualRevealOpacities,
   type SmoothedLayerOpacity,
 } from '../lib/reveal'
 import { ProximityHaptics } from '../lib/haptics'
+import {
+  clearStoredSensorGrant,
+  hasStoredSensorGrant,
+  needsMotionPermissionPrompt,
+} from '../lib/sensorPermission'
 import { releaseWakeLock, requestWakeLock } from '../lib/wakeLock'
 import { attachGallerySwipe } from './gallery'
 
@@ -51,6 +58,7 @@ export class App {
   private latestReading: OrientationReading = { beta: null, gamma: null, alpha: null }
   private proximityHaptics = new ProximityHaptics()
   private preloadCache = new Map<string, Promise<void>>()
+  private sensorPermissionOverlay: HTMLElement | null = null
 
   constructor(root: HTMLElement) {
     this.root = root
@@ -191,7 +199,7 @@ export class App {
     })
   }
 
-  private async ensureSensors(): Promise<boolean> {
+  private async ensureSensors(options: { requestPermission?: boolean } = {}): Promise<boolean> {
     if (this.sensorsReady) {
       return true
     }
@@ -200,9 +208,16 @@ export class App {
     }
     this.sensorsRequestInFlight = true
 
-    const granted = await this.orientation.requestAccess()
+    const requestPermission = options.requestPermission ?? true
+    const granted = await this.orientation.requestAccess({
+      skipPermissionPrompt: !requestPermission,
+    })
     if (!granted) {
       this.sensorsRequestInFlight = false
+      if (!requestPermission) {
+        clearStoredSensorGrant()
+        this.showSensorPermissionOverlay()
+      }
       return false
     }
 
@@ -211,7 +226,72 @@ export class App {
     })
     this.sensorsReady = true
     this.sensorsRequestInFlight = false
+    this.hideSensorPermissionOverlay()
     return true
+  }
+
+  /** iOS: prompt once on load; reuse saved grant on later visits. */
+  initSensorAccess(): void {
+    if (!needsMotionPermissionPrompt()) {
+      return
+    }
+
+    if (hasStoredSensorGrant()) {
+      void this.ensureSensors({ requestPermission: false })
+      return
+    }
+
+    this.showSensorPermissionOverlay()
+  }
+
+  private showSensorPermissionOverlay(): void {
+    if (this.sensorPermissionOverlay) {
+      this.sensorPermissionOverlay.hidden = false
+      return
+    }
+
+    const overlay = document.createElement('div')
+    overlay.className = 'sensor-permission-overlay'
+    overlay.setAttribute('role', 'dialog')
+    overlay.setAttribute('aria-modal', 'true')
+    overlay.setAttribute('aria-labelledby', 'sensor-permission-title')
+    overlay.innerHTML = `
+      <div class="sensor-permission-card">
+        <h2 id="sensor-permission-title" class="sensor-permission-title">Allow motion access</h2>
+        <p class="sensor-permission-copy">
+          Photos uses motion and orientation to reveal hidden details when you tilt your phone.
+        </p>
+        <button type="button" class="sensor-permission-button" data-action="enable-sensors">
+          Continue
+        </button>
+        <p class="sensor-permission-denied" data-sensor-denied hidden>
+          Motion access was denied. Open Settings → Safari → Motion &amp; Orientation Access, then try again.
+        </p>
+      </div>
+    `
+
+    overlay.querySelector('[data-action="enable-sensors"]')?.addEventListener('click', () => {
+      void this.requestSensorPermissionFromOverlay()
+    })
+
+    document.body.append(overlay)
+    this.sensorPermissionOverlay = overlay
+  }
+
+  private hideSensorPermissionOverlay(): void {
+    if (this.sensorPermissionOverlay) {
+      this.sensorPermissionOverlay.hidden = true
+    }
+  }
+
+  private async requestSensorPermissionFromOverlay(): Promise<void> {
+    const denied = this.sensorPermissionOverlay?.querySelector<HTMLElement>('[data-sensor-denied]')
+    denied?.setAttribute('hidden', '')
+
+    const granted = await this.ensureSensors({ requestPermission: true })
+    if (!granted) {
+      denied?.removeAttribute('hidden')
+    }
   }
 
   private async openPhoto(index: number): Promise<void> {
@@ -227,9 +307,8 @@ export class App {
     this.setScreen('gallery')
     void this.acquireWakeLock()
 
-    // Request sensors after navigation so Android doesn't "hang" on the grid.
-    // Still triggered from the tap handler (user gesture) but we don't block UI.
-    void this.ensureSensors()
+    // Fallback if iOS permission overlay was dismissed without granting.
+    void this.ensureSensors({ requestPermission: !hasStoredSensorGrant() })
   }
 
   private renderGallery(): void {
@@ -257,6 +336,12 @@ export class App {
                 draggable="false"
               />
               ${numberLayer}
+            </div>
+            <div class="tilt-edge-gradients" aria-hidden="true">
+              <span class="tilt-edge-gradient tilt-edge-gradient--top" data-tilt-gradient="top"></span>
+              <span class="tilt-edge-gradient tilt-edge-gradient--right" data-tilt-gradient="right"></span>
+              <span class="tilt-edge-gradient tilt-edge-gradient--bottom" data-tilt-gradient="bottom"></span>
+              <span class="tilt-edge-gradient tilt-edge-gradient--left" data-tilt-gradient="left"></span>
             </div>
             <div class="tilt-hints" aria-hidden="true">
               <span class="tilt-hint tilt-hint--top" data-tilt-hint="top" data-tilt-label="${TILT_HINT_LABEL}">
@@ -339,8 +424,66 @@ export class App {
     this.puzzleIndex = index
     this.galleryDragPx = 0
     this.proximityHaptics.reset()
+    this.syncSlideOpacityOnNavigate(index)
     this.updateGalleryChrome()
     this.updateGalleryTransform(true)
+
+    const slides = this.galleryContainer?.querySelectorAll<HTMLElement>('[data-slide]')
+    if (slides) {
+      this.updateGallerySlides(slides)
+    }
+  }
+
+  private getSlideRevealOpacities(index: number): DualRevealOpacities {
+    const puzzle = puzzles[index]
+    const remapAxes = shouldRemapTiltAxes(this.orientation.sensorSource)
+    const reading = remapAxes ? remapTiltReading(this.latestReading) : this.latestReading
+    const target = remapAxes ? remapTiltTarget(puzzle.target) : puzzle.target
+
+    return computeDualRevealOpacity(
+      reading,
+      target,
+      puzzle.car.tolerance,
+      puzzle.number?.tolerance,
+    )
+  }
+
+  /** Snap reveal state to current tilt when landing on a slide (avoids bleed from the previous photo). */
+  private syncSlideOpacityOnNavigate(index: number): void {
+    if (this.slideLocked[index]) {
+      return
+    }
+
+    if (!this.sensorsReady) {
+      this.smoothedOpacity[index] = { car: 0, number: 0 }
+      return
+    }
+
+    const puzzle = puzzles[index]
+    const { car, number, distance } = this.getSlideRevealOpacities(index)
+
+    if (!isWithinCarRevealRange(distance, puzzle.car.tolerance)) {
+      this.smoothedOpacity[index] = { car: 0, number: 0 }
+      return
+    }
+
+    this.smoothedOpacity[index] = { car, number }
+  }
+
+  private slideUsesRevealOpacity(index: number): boolean {
+    if (index === this.puzzleIndex) {
+      return true
+    }
+
+    if (Math.abs(this.galleryDragPx) <= 1) {
+      return false
+    }
+
+    if (this.galleryDragPx < 0 && index === this.puzzleIndex + 1) {
+      return true
+    }
+
+    return this.galleryDragPx > 0 && index === this.puzzleIndex - 1
   }
 
   private updateGalleryTransform(animate: boolean): void {
@@ -385,6 +528,7 @@ export class App {
       const carLayer = slide.querySelector('[data-car-layer]') as HTMLElement | null
       const numberLayer = slide.querySelector('[data-number-layer]') as HTMLElement | null
       const hintElements = slide.querySelectorAll<HTMLElement>('[data-tilt-hint]')
+      const gradientElements = slide.querySelectorAll<HTMLElement>('[data-tilt-gradient]')
 
       if (this.slideLocked[index]) {
         if (carLayer) {
@@ -395,6 +539,23 @@ export class App {
         }
         for (const element of hintElements) {
           this.applyTiltHintElement(element, { strength: 0, locked: false })
+        }
+        for (const element of gradientElements) {
+          this.applyTiltEdgeGradient(element, { strength: 0, locked: false })
+        }
+        return
+      }
+
+      const isActive = index === this.puzzleIndex
+      const usesReveal = this.slideUsesRevealOpacity(index)
+
+      if (!usesReveal) {
+        this.smoothedOpacity[index] = { car: 0, number: 0 }
+        if (carLayer) {
+          carLayer.style.opacity = '0'
+        }
+        if (numberLayer) {
+          numberLayer.style.opacity = '0'
         }
         return
       }
@@ -411,13 +572,23 @@ export class App {
       )
 
       const hasReading = this.sensorsReady && distance !== null
-      const opacityLerp = opacityLerpForSensorSource(this.orientation.sensorSource)
-      this.smoothedOpacity[index] = lerpLayerOpacity(
-        this.smoothedOpacity[index],
-        { car, number },
-        hasReading,
-        opacityLerp,
-      )
+      const inCarRange = isWithinCarRevealRange(distance, puzzle.car.tolerance)
+      const liveTarget: SmoothedLayerOpacity =
+        hasReading && inCarRange ? { car, number } : { car: 0, number: 0 }
+
+      if (!isActive) {
+        // During a swipe, preview the incoming photo for the current tilt only.
+        this.smoothedOpacity[index] = liveTarget
+      } else {
+        const opacityLerp = opacityLerpForSensorSource(this.orientation.sensorSource)
+        this.smoothedOpacity[index] = lerpLayerOpacity(
+          this.smoothedOpacity[index],
+          { car, number },
+          hasReading,
+          opacityLerp,
+        )
+      }
+
       const displayCar = this.smoothedOpacity[index].car
       const displayNumber = this.smoothedOpacity[index].number
 
@@ -427,8 +598,6 @@ export class App {
       if (numberLayer) {
         numberLayer.style.opacity = String(displayNumber)
       }
-
-      const isActive = index === this.puzzleIndex
 
       if (isActive && this.sensorsReady) {
         this.proximityHaptics.update(
@@ -451,9 +620,17 @@ export class App {
           const sideState: TiltHintSideState = side ? hintState[side] : { strength: 0, locked: false }
           this.applyTiltHintElement(element, sideState)
         }
+        for (const element of gradientElements) {
+          const side = element.dataset.tiltGradient as keyof typeof hintState | undefined
+          const sideState: TiltHintSideState = side ? hintState[side] : { strength: 0, locked: false }
+          this.applyTiltEdgeGradient(element, sideState)
+        }
       } else if (isActive) {
         for (const element of hintElements) {
           this.applyTiltHintElement(element, { strength: 0, locked: false })
+        }
+        for (const element of gradientElements) {
+          this.applyTiltEdgeGradient(element, { strength: 0, locked: false })
         }
       }
 
@@ -471,6 +648,9 @@ export class App {
         }
         for (const element of hintElements) {
           this.applyTiltHintElement(element, { strength: 0, locked: false })
+        }
+        for (const element of gradientElements) {
+          this.applyTiltEdgeGradient(element, { strength: 0, locked: false })
         }
         this.updateGalleryChrome()
       }
@@ -503,7 +683,7 @@ export class App {
       if (label) {
         label.textContent = '✓'
       }
-      element.style.setProperty('--hint-scale', '0.72')
+      element.style.setProperty('--hint-scale', '1')
       element.style.opacity = '1'
       element.classList.add('is-axis-locked')
       element.classList.remove('is-active')
@@ -522,10 +702,21 @@ export class App {
       return
     }
 
-    const scale = 0.4 + 0.35 * state.strength
+    const scale = 0.65 + 0.55 * state.strength
     element.style.setProperty('--hint-scale', String(scale))
-    element.style.opacity = String(0.3 + 0.7 * state.strength)
-    element.classList.toggle('is-active', state.strength > 0.55)
+    element.style.opacity = String(0.45 + 0.55 * state.strength)
+    element.classList.toggle('is-active', state.strength > 0.45)
+  }
+
+  private applyTiltEdgeGradient(element: HTMLElement, state: TiltHintSideState): void {
+    if (state.locked || state.strength <= 0) {
+      element.style.opacity = '0'
+      element.classList.remove('is-active')
+      return
+    }
+
+    element.style.opacity = String(0.2 + 0.65 * state.strength)
+    element.classList.toggle('is-active', state.strength > 0.35)
   }
 
   private stopGalleryLoop(): void {

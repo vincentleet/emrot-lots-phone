@@ -1,4 +1,5 @@
 import type { OrientationReading, OrientationTarget } from '../config/types'
+import { markStoredSensorGrant } from './sensorPermission'
 
 type OrientationListener = (reading: OrientationReading) => void
 
@@ -6,6 +7,15 @@ export type SensorSource = 'orientation' | 'motion' | null
 
 interface DeviceOrientationEventConstructorWithPermission {
   requestPermission?: () => Promise<'granted' | 'denied'>
+}
+
+interface DeviceMotionEventConstructorWithPermission {
+  requestPermission?: () => Promise<'granted' | 'denied'>
+}
+
+export interface RequestAccessOptions {
+  /** Skip iOS permission dialogs (use when grant was saved from a prior visit). */
+  skipPermissionPrompt?: boolean
 }
 
 const ORIENTATION_EVENTS = ['deviceorientation', 'deviceorientationabsolute'] as const
@@ -62,17 +72,48 @@ export class OrientationManager {
     return this.source
   }
 
-  async requestAccess(): Promise<boolean> {
-    const DeviceOrientation = DeviceOrientationEvent as unknown as DeviceOrientationEventConstructorWithPermission
-
-    if (typeof DeviceOrientation.requestPermission === 'function') {
-      const result = await DeviceOrientation.requestPermission()
-      if (result !== 'granted') {
+  async requestAccess(options: RequestAccessOptions = {}): Promise<boolean> {
+    if (!options.skipPermissionPrompt) {
+      const [orientationGranted, motionGranted] = await Promise.all([
+        this.requestOrientationPermission(),
+        this.requestMotionPermission(),
+      ])
+      if (!orientationGranted && !motionGranted) {
         return false
       }
     }
 
-    return this.waitForFirstReading(5000)
+    const gotReading = await this.waitForFirstReading(5000)
+    if (gotReading) {
+      markStoredSensorGrant()
+    }
+    return gotReading
+  }
+
+  private async requestOrientationPermission(): Promise<boolean> {
+    const DeviceOrientation = DeviceOrientationEvent as unknown as DeviceOrientationEventConstructorWithPermission
+    if (typeof DeviceOrientation.requestPermission !== 'function') {
+      return true
+    }
+
+    try {
+      return (await DeviceOrientation.requestPermission()) === 'granted'
+    } catch {
+      return false
+    }
+  }
+
+  private async requestMotionPermission(): Promise<boolean> {
+    const DeviceMotion = DeviceMotionEvent as unknown as DeviceMotionEventConstructorWithPermission
+    if (typeof DeviceMotion.requestPermission !== 'function') {
+      return true
+    }
+
+    try {
+      return (await DeviceMotion.requestPermission()) === 'granted'
+    } catch {
+      return false
+    }
   }
 
   start(listener: OrientationListener): void {

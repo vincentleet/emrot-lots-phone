@@ -20,6 +20,7 @@ if (!root) {
 
 const app = new App(root)
 app.bindNavigation()
+app.initSensorAccess()
 
 registerSW({
   immediate: true,
