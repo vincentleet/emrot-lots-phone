@@ -14,6 +14,7 @@ import {
   lerpLayerOpacity,
   type SmoothedLayerOpacity,
 } from '../lib/reveal'
+import { ProximityHaptics } from '../lib/haptics'
 import { releaseWakeLock, requestWakeLock } from '../lib/wakeLock'
 import { attachGallerySwipe } from './gallery'
 
@@ -40,6 +41,7 @@ export class App {
   private calibrationTapTimer: number | null = null
   private returnScreen: Screen = 'intro'
   private latestReading: OrientationReading = { beta: null, gamma: null, alpha: null }
+  private proximityHaptics = new ProximityHaptics()
 
   constructor(root: HTMLElement) {
     this.root = root
@@ -54,6 +56,7 @@ export class App {
 
   private setScreen(screen: Screen): void {
     this.stopGalleryLoop()
+    this.proximityHaptics.reset()
     this.detachGallerySwipe?.()
     this.detachGallerySwipe = null
     this.galleryResizeObserver?.disconnect()
@@ -246,6 +249,7 @@ export class App {
   private goToSlide(index: number): void {
     this.puzzleIndex = index
     this.galleryDragPx = 0
+    this.proximityHaptics.reset()
     this.updateGalleryChrome()
     this.updateGalleryTransform(true)
   }
@@ -319,6 +323,15 @@ export class App {
         }
         const isActive = index === this.puzzleIndex
 
+        if (isActive) {
+          this.proximityHaptics.update(
+            distance,
+            puzzle.car.tolerance,
+            puzzle.number?.tolerance,
+            { locked: this.slideLocked[index], active: true },
+          )
+        }
+
         if (!this.slideLocked[index] && isActive) {
           const hintTolerance = hintToleranceForDistance(
             distance,
@@ -341,6 +354,9 @@ export class App {
 
         if (!this.slideLocked[index] && puzzle.number && isDigitFound(displayNumber)) {
           this.slideLocked[index] = true
+          if (isActive) {
+            this.proximityHaptics.success()
+          }
           numberLayer?.classList.add('is-locked')
           if (carLayer) {
             carLayer.style.opacity = '1'
@@ -367,6 +383,7 @@ export class App {
       window.cancelAnimationFrame(this.rafId)
       this.rafId = null
     }
+    this.proximityHaptics.cancel()
   }
 
   private renderSummary(): void {
