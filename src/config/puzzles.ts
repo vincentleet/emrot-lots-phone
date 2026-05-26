@@ -4,17 +4,20 @@ import type { Puzzle } from './types'
 
 type PuzzleDraft = Omit<Puzzle, 'id'>
 
-/** Key = car number from filename (car1.png → 1). Exported in that order. */
+/**
+ * Key = car number from filename (car1.png → 1).
+ * Album order is always car1, car2, car3, … by file number.
+ */
 const puzzleByCarNumber: Record<number, PuzzleDraft> = {
   1: {
-    target: { beta: 48, gamma: 0 },
+    target: { beta: 52, gamma: 0 },
     car: {
       image: assetUrl('assets/cars/car1.png'),
       tolerance: 50,
     },
   },
   2: {
-    target: { beta: 48, gamma: 0 },
+    target: { beta: 50, gamma: 28 },
     car: {
       image: assetUrl('assets/cars/car2.png'),
       tolerance: 50,
@@ -22,7 +25,7 @@ const puzzleByCarNumber: Record<number, PuzzleDraft> = {
   },
   3: {
     digit: '3',
-    target: { beta: 45, gamma: 38 },
+    target: { beta: 46, gamma: 62 },
     car: {
       image: assetUrl('assets/cars/car3.png'),
       tolerance: 50,
@@ -33,40 +36,48 @@ const puzzleByCarNumber: Record<number, PuzzleDraft> = {
     },
   },
   4: {
-    digit: '4',
-    target: { beta: 48, gamma: 0 },
+    target: { beta: 54, gamma: -24 },
     car: {
       image: assetUrl('assets/cars/car4.png'),
       tolerance: 50,
     },
-    number: {
-      image: assetUrl('assets/cars/car4-number.png'),
-      tolerance: 10,
-    },
   },
   5: {
-    target: { beta: 48, gamma: 0 },
+    target: { beta: 50, gamma: 0 },
     car: {
       image: assetUrl('assets/cars/car5.png'),
       tolerance: 50,
     },
   },
   6: {
-    target: { beta: 48, gamma: 0 },
+    digit: '6',
+    target: { beta: 44, gamma: -52 },
     car: {
       image: assetUrl('assets/cars/car6.png'),
       tolerance: 50,
     },
+    number: {
+      image: assetUrl('assets/cars/car6-number.png'),
+      tolerance: 10,
+    },
   },
   7: {
-    digit: '7',
-    target: { beta: 18, gamma: 0 },
+    target: { beta: 48, gamma: 18 },
     car: {
       image: assetUrl('assets/cars/car7.png'),
       tolerance: 50,
     },
+  },
+  8: {
+    digit: '8',
+    // Camera toward the floor — tip the top of the phone down
+    target: { beta: 82, gamma: 0 },
+    car: {
+      image: assetUrl('assets/cars/car8.png'),
+      tolerance: 50,
+    },
     number: {
-      image: assetUrl('assets/cars/car7-number.png'),
+      image: assetUrl('assets/cars/car8-number.png'),
       tolerance: 10,
     },
   },
@@ -85,7 +96,6 @@ function buildPuzzles(): Puzzle[] {
 
 export const puzzles: Puzzle[] = buildPuzzles()
 
-/** Dev guard: album index must match car filename number. */
 if (import.meta.env.DEV) {
   for (const [index, puzzle] of puzzles.entries()) {
     const fileNum = carNumberFromPath(puzzle.car.image)

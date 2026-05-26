@@ -20,7 +20,7 @@ Each puzzle uses **two PNGs** in [`public/assets/cars/`](public/assets/cars/):
 | `car1.png` | Full car photo (reveals with a **wide** tilt tolerance) |
 | `car4-number.png` | Same dimensions as its car, **transparent** PNG with the digit baked in (reveals with a **narrow** tolerance) |
 
-Match the number file to the car (`car3.png` + `car3-number.png`). The album shows photos in **car number order** (1, 2, 3…). The final code uses **digit order** (3, 4, 7…).
+Match the number file to the car (`car3.png` + `car3-number.png`). The album shows photos in **filename order** (`car1.png`, `car2.png`, …). The final code uses **digit order** (3, 6, 8…).
 
 **Decoy photos** (car only, no hidden number): add just `car6.png` and omit the `number` block in config — they still appear in the swipe carousel with tilt arrows and a wide reveal zone.
 
