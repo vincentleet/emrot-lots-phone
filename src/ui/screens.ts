@@ -3,9 +3,9 @@ import { albumThumbUrl } from '../lib/assets'
 import type { OrientationReading } from '../config/types'
 import {
   computeTiltHintState,
-  invertTiltHintState,
+  invertTiltHintStateVertical,
   isAndroidDevice,
-  tiltHintLabel,
+  TILT_HINT_LABEL,
   type TiltHintSideState,
   formatOrientation,
   formatTarget,
@@ -222,6 +222,7 @@ export class App {
     }
 
     this.puzzleIndex = index
+    this.smoothedOpacity[index] = { car: 0, number: 0 }
     this.setScreen('gallery')
     void this.acquireWakeLock()
 
@@ -257,17 +258,17 @@ export class App {
               ${numberLayer}
             </div>
             <div class="tilt-hints" aria-hidden="true">
-              <span class="tilt-hint tilt-hint--top" data-tilt-hint="top" data-tilt-label="${tiltHintLabel('top')}">
-                <span class="tilt-hint-label">${tiltHintLabel('top')}</span>
+              <span class="tilt-hint tilt-hint--top" data-tilt-hint="top" data-tilt-label="${TILT_HINT_LABEL}">
+                <span class="tilt-hint-label">${TILT_HINT_LABEL}</span>
               </span>
-              <span class="tilt-hint tilt-hint--right" data-tilt-hint="right" data-tilt-label="${tiltHintLabel('right')}">
-                <span class="tilt-hint-label">${tiltHintLabel('right')}</span>
+              <span class="tilt-hint tilt-hint--right" data-tilt-hint="right" data-tilt-label="${TILT_HINT_LABEL}">
+                <span class="tilt-hint-label">${TILT_HINT_LABEL}</span>
               </span>
-              <span class="tilt-hint tilt-hint--bottom" data-tilt-hint="bottom" data-tilt-label="${tiltHintLabel('bottom')}">
-                <span class="tilt-hint-label">${tiltHintLabel('bottom')}</span>
+              <span class="tilt-hint tilt-hint--bottom" data-tilt-hint="bottom" data-tilt-label="${TILT_HINT_LABEL}">
+                <span class="tilt-hint-label">${TILT_HINT_LABEL}</span>
               </span>
-              <span class="tilt-hint tilt-hint--left" data-tilt-hint="left" data-tilt-label="${tiltHintLabel('left')}">
-                <span class="tilt-hint-label">${tiltHintLabel('left')}</span>
+              <span class="tilt-hint tilt-hint--left" data-tilt-hint="left" data-tilt-label="${TILT_HINT_LABEL}">
+                <span class="tilt-hint-label">${TILT_HINT_LABEL}</span>
               </span>
             </div>
           </article>
@@ -322,7 +323,10 @@ export class App {
     this.attachBackToGrid(container)
     this.root.append(container)
     this.updateGalleryTransform(false)
-    this.startGalleryLoop(container)
+
+    const slides = container.querySelectorAll<HTMLElement>('[data-slide]')
+    this.updateGallerySlides(slides)
+    this.startGalleryLoop(container, slides)
 
     this.galleryResizeObserver = new ResizeObserver(() => this.updateGalleryTransform(false))
     if (viewport) {
@@ -374,109 +378,114 @@ export class App {
     })
   }
 
-  private startGalleryLoop(container: HTMLElement): void {
-    const slides = container.querySelectorAll<HTMLElement>('[data-slide]')
+  private updateGallerySlides(slides: NodeListOf<HTMLElement>): void {
+    slides.forEach((slide, index) => {
+      const puzzle = puzzles[index]
+      const carLayer = slide.querySelector('[data-car-layer]') as HTMLElement | null
+      const numberLayer = slide.querySelector('[data-number-layer]') as HTMLElement | null
+      const hintElements = slide.querySelectorAll<HTMLElement>('[data-tilt-hint]')
 
-    const tick = () => {
-      this.updateGalleryChrome()
-      slides.forEach((slide, index) => {
-        // If sensors never became ready (e.g. Android with motion sensors disabled),
-        // fall back to showing static photos instead of a black screen.
-        if (!this.sensorsReady) {
-          const carLayer = slide.querySelector('[data-car-layer]') as HTMLElement | null
-          const numberLayer = slide.querySelector('[data-number-layer]') as HTMLElement | null
-          const hintElements = slide.querySelectorAll<HTMLElement>('[data-tilt-hint]')
-
-          if (carLayer) {
-            carLayer.style.opacity = '1'
-          }
-          if (numberLayer && !this.slideLocked[index]) {
-            numberLayer.style.opacity = '0'
-          }
-          for (const element of hintElements) {
-            this.applyTiltHintElement(element, { strength: 0, locked: false })
-          }
-          return
+      if (this.slideLocked[index]) {
+        if (carLayer) {
+          carLayer.style.opacity = '1'
         }
+        if (numberLayer) {
+          numberLayer.style.opacity = '1'
+        }
+        for (const element of hintElements) {
+          this.applyTiltHintElement(element, { strength: 0, locked: false })
+        }
+        return
+      }
 
-        const puzzle = puzzles[index]
-        const carLayer = slide.querySelector('[data-car-layer]') as HTMLElement | null
-        const numberLayer = slide.querySelector('[data-number-layer]') as HTMLElement | null
-        const hintElements = slide.querySelectorAll<HTMLElement>('[data-tilt-hint]')
-        const { car, number, distance } = computeDualRevealOpacity(
-          this.latestReading,
-          puzzle.target,
+      const { car, number, distance } = computeDualRevealOpacity(
+        this.latestReading,
+        puzzle.target,
+        puzzle.car.tolerance,
+        puzzle.number?.tolerance,
+      )
+
+      const hasReading = this.sensorsReady && distance !== null
+      const opacityLerp = opacityLerpForSensorSource(this.orientation.sensorSource)
+      this.smoothedOpacity[index] = lerpLayerOpacity(
+        this.smoothedOpacity[index],
+        { car, number },
+        hasReading,
+        opacityLerp,
+      )
+      const displayCar = this.smoothedOpacity[index].car
+      const displayNumber = this.smoothedOpacity[index].number
+
+      if (carLayer) {
+        carLayer.style.opacity = String(displayCar)
+      }
+      if (numberLayer) {
+        numberLayer.style.opacity = String(displayNumber)
+      }
+
+      const isActive = index === this.puzzleIndex
+
+      if (isActive && this.sensorsReady) {
+        this.proximityHaptics.update(
+          distance,
+          puzzle.car.tolerance,
+          puzzle.number?.tolerance,
+          { locked: false, active: true },
+        )
+      }
+
+      if (!this.slideLocked[index] && isActive && this.sensorsReady) {
+        const hintTolerance = hintToleranceForDistance(
+          distance,
           puzzle.car.tolerance,
           puzzle.number?.tolerance,
         )
+        let hintState = computeTiltHintState(this.latestReading, puzzle.target, hintTolerance)
+        if (isAndroidDevice()) {
+          hintState = invertTiltHintStateVertical(hintState)
+        }
+        for (const element of hintElements) {
+          const side = element.dataset.tiltHint as keyof typeof hintState | undefined
+          const sideState: TiltHintSideState = side ? hintState[side] : { strength: 0, locked: false }
+          this.applyTiltHintElement(element, sideState)
+        }
+      } else if (isActive) {
+        for (const element of hintElements) {
+          this.applyTiltHintElement(element, { strength: 0, locked: false })
+        }
+      }
 
-        const hasReading = distance !== null
-        const opacityLerp = opacityLerpForSensorSource(this.orientation.sensorSource)
-        this.smoothedOpacity[index] = lerpLayerOpacity(
-          this.smoothedOpacity[index],
-          { car, number },
-          hasReading,
-          opacityLerp,
-        )
-        const displayCar = this.slideLocked[index] ? 1 : this.smoothedOpacity[index].car
-        const displayNumber = this.slideLocked[index] ? 1 : this.smoothedOpacity[index].number
-
+      if (!this.slideLocked[index] && puzzle.number && isDigitFound(displayNumber)) {
+        this.slideLocked[index] = true
+        if (isActive) {
+          this.proximityHaptics.success()
+        }
+        numberLayer?.classList.add('is-locked')
         if (carLayer) {
-          carLayer.style.opacity = String(displayCar)
+          carLayer.style.opacity = '1'
         }
         if (numberLayer) {
-          numberLayer.style.opacity = String(displayNumber)
+          numberLayer.style.opacity = '1'
         }
-        const isActive = index === this.puzzleIndex
+        for (const element of hintElements) {
+          this.applyTiltHintElement(element, { strength: 0, locked: false })
+        }
+        this.updateGalleryChrome()
+      }
+    })
+  }
 
-        if (isActive) {
-          this.proximityHaptics.update(
-            distance,
-            puzzle.car.tolerance,
-            puzzle.number?.tolerance,
-            { locked: this.slideLocked[index], active: true },
-          )
-        }
+  private startGalleryLoop(container: HTMLElement, slides: NodeListOf<HTMLElement>): void {
+    let revealTransitionsEnabled = false
 
-        if (!this.slideLocked[index] && isActive) {
-          const hintTolerance = hintToleranceForDistance(
-            distance,
-            puzzle.car.tolerance,
-            puzzle.number?.tolerance,
-          )
-          let hintState = computeTiltHintState(this.latestReading, puzzle.target, hintTolerance)
-          if (isAndroidDevice()) {
-            hintState = invertTiltHintState(hintState)
-          }
-          for (const element of hintElements) {
-            const side = element.dataset.tiltHint as keyof typeof hintState | undefined
-            const sideState: TiltHintSideState = side ? hintState[side] : { strength: 0, locked: false }
-            this.applyTiltHintElement(element, sideState)
-          }
-        } else if (isActive) {
-          for (const element of hintElements) {
-            this.applyTiltHintElement(element, { strength: 0, locked: false })
-          }
-        }
+    const tick = () => {
+      this.updateGalleryChrome()
+      this.updateGallerySlides(slides)
 
-        if (!this.slideLocked[index] && puzzle.number && isDigitFound(displayNumber)) {
-          this.slideLocked[index] = true
-          if (isActive) {
-            this.proximityHaptics.success()
-          }
-          numberLayer?.classList.add('is-locked')
-          if (carLayer) {
-            carLayer.style.opacity = '1'
-          }
-          if (numberLayer) {
-            numberLayer.style.opacity = '1'
-          }
-          for (const element of hintElements) {
-            this.applyTiltHintElement(element, { strength: 0, locked: false })
-          }
-          this.updateGalleryChrome()
-        }
-      })
+      if (!revealTransitionsEnabled) {
+        revealTransitionsEnabled = true
+        container.classList.add('is-reveal-ready')
+      }
 
       this.rafId = window.requestAnimationFrame(tick)
     }

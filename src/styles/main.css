@@ -351,17 +351,21 @@ body {
   object-fit: contain;
   object-position: center;
   pointer-events: none;
-  opacity: 1;
+  transition: none;
+}
+
+.gallery-screen.is-reveal-ready .photos-image {
   transition: opacity 0.14s ease-out;
 }
 
 /* Android accelerometer fallback: less CSS easing on top of JS smoothing */
-.gallery-screen--accel .photos-image {
+.gallery-screen--accel.is-reveal-ready .photos-image {
   transition: opacity 0.03s linear;
 }
 
 .photos-image--car {
   z-index: 1;
+  opacity: 0;
 }
 
 .photos-image--number {

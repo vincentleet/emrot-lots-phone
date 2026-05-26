@@ -245,29 +245,15 @@ export function isAndroidDevice(): boolean {
   return /android/i.test(navigator.userAgent)
 }
 
-export type TiltHintSide = keyof TiltHintsState
+export const TILT_HINT_LABEL = 'Tilt'
 
-const TILT_LABELS: Record<TiltHintSide, string> = {
-  top: 'Tilt up',
-  bottom: 'Tilt down',
-  left: 'Tilt left',
-  right: 'Tilt right',
-}
-
-/** Label for each screen edge; position never changes (Android only inverts which hint lights up). */
-export function tiltHintLabel(side: TiltHintSide): string {
-  return TILT_LABELS[side]
-}
-
-/** Swap edge hints — used when accelerometer tilt axes are inverted vs iOS gyro. */
-export function invertTiltHintState(state: TiltHintsState): TiltHintsState {
+/** Swap top/bottom hint strength on Android (accel axes differ from iOS gyro). */
+export function invertTiltHintStateVertical(state: TiltHintsState): TiltHintsState {
   const betaLocked = state.top.locked || state.bottom.locked
-  const gammaLocked = state.left.locked || state.right.locked
   return {
+    ...state,
     top: { strength: state.bottom.strength, locked: betaLocked },
     bottom: { strength: state.top.strength, locked: betaLocked },
-    left: { strength: state.right.strength, locked: gammaLocked },
-    right: { strength: state.left.strength, locked: gammaLocked },
   }
 }
 
