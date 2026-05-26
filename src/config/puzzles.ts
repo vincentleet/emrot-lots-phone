@@ -5,9 +5,9 @@ import type { Puzzle } from './types'
 type PuzzleDraft = Omit<Puzzle, 'id'>
 
 /** Wide zone: car image fades in over a large tilt range. */
-const CAR_TOLERANCE = 58
+const CAR_TOLERANCE = 72
 /** Wider sweet spot for locking the digit angle. */
-const NUMBER_TOLERANCE = 14
+const NUMBER_TOLERANCE = 22
 
 /**
  * Key = car number from filename (car1.png → 1).

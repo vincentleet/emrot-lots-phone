@@ -23,6 +23,8 @@ app.bindNavigation()
 
 registerSW({
   immediate: true,
+  // Suppress full-page reload when an update activates (kiosk / in-session play).
+  onNeedReload() {},
   onOfflineReady() {
     console.info('Spy Phone is ready to work offline.')
   },

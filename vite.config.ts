@@ -7,7 +7,8 @@ export default defineConfig({
   base,
   plugins: [
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt' avoids auto-reload when a new SW is found (autoUpdate reloads ~1s after load).
+      registerType: 'prompt',
       includeAssets: ['favicon.svg', 'assets/cars/**/*', 'assets/cars/thumbs/**/*'],
       manifest: {
         name: 'Photos',
