@@ -377,10 +377,6 @@ body {
   opacity: 0;
 }
 
-.photos-image--number.is-locked {
-  opacity: 1;
-}
-
 .photos-image--number.is-number-flash {
   animation: number-reveal-flash 0.6s ease-out;
 }
@@ -434,87 +430,6 @@ body {
   width: 1.25rem;
   opacity: 1;
   background: var(--md-sys-color-primary);
-}
-
-.tilt-edge-gradients {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  pointer-events: none;
-  overflow: hidden;
-}
-
-.tilt-edge-gradient {
-  position: absolute;
-  opacity: 0;
-  transition: opacity 0.22s ease-out;
-}
-
-.tilt-edge-gradient--top {
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 42%;
-  background: linear-gradient(
-    to bottom,
-    rgba(168, 199, 250, 0.52) 0%,
-    rgba(168, 199, 250, 0.12) 45%,
-    transparent 100%
-  );
-}
-
-.tilt-edge-gradient--bottom {
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 42%;
-  background: linear-gradient(
-    to top,
-    rgba(168, 199, 250, 0.52) 0%,
-    rgba(168, 199, 250, 0.12) 45%,
-    transparent 100%
-  );
-}
-
-.tilt-edge-gradient--left {
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 38%;
-  background: linear-gradient(
-    to right,
-    rgba(168, 199, 250, 0.52) 0%,
-    rgba(168, 199, 250, 0.12) 45%,
-    transparent 100%
-  );
-}
-
-.tilt-edge-gradient--right {
-  top: 0;
-  bottom: 0;
-  right: 0;
-  width: 38%;
-  background: linear-gradient(
-    to left,
-    rgba(168, 199, 250, 0.52) 0%,
-    rgba(168, 199, 250, 0.12) 45%,
-    transparent 100%
-  );
-}
-
-.tilt-edge-gradient.is-active {
-  animation: tilt-edge-pulse 2.6s ease-in-out infinite;
-}
-
-@keyframes tilt-edge-pulse {
-  0%,
-  100% {
-    filter: brightness(1);
-  }
-
-  50% {
-    filter: brightness(1.12);
-  }
 }
 
 .tilt-hints {

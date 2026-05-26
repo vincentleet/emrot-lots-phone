@@ -15,7 +15,6 @@ import {
 import {
   computeDualRevealOpacity,
   hintToleranceForDistance,
-  isDigitFound,
   isWithinCarRevealRange,
   lerpLayerOpacity,
   opacityLerpForSensorSource,
@@ -43,7 +42,6 @@ export class App {
   private sensorsReady = false
   private sensorsRequestInFlight = false
   private puzzleIndex = 0
-  private slideLocked: boolean[] = puzzles.map(() => false)
   private smoothedOpacity: SmoothedLayerOpacity[] = puzzles.map(() => ({ car: 0, number: 0 }))
   private galleryContainer: HTMLElement | null = null
   private galleryTrack: HTMLElement | null = null
@@ -319,7 +317,7 @@ export class App {
       .map((puzzle, index) => {
         const numberLayer = puzzle.number
           ? `<img
-                class="photos-image photos-image--number ${this.slideLocked[index] ? 'is-locked' : ''}"
+                class="photos-image photos-image--number"
                 data-number-layer
                 src="${puzzle.number.image}"
                 alt=""
@@ -338,12 +336,6 @@ export class App {
                 draggable="false"
               />
               ${numberLayer}
-            </div>
-            <div class="tilt-edge-gradients" aria-hidden="true">
-              <span class="tilt-edge-gradient tilt-edge-gradient--top" data-tilt-gradient="top"></span>
-              <span class="tilt-edge-gradient tilt-edge-gradient--right" data-tilt-gradient="right"></span>
-              <span class="tilt-edge-gradient tilt-edge-gradient--bottom" data-tilt-gradient="bottom"></span>
-              <span class="tilt-edge-gradient tilt-edge-gradient--left" data-tilt-gradient="left"></span>
             </div>
             <div class="tilt-hints" aria-hidden="true">
               <span class="tilt-hint tilt-hint--top" data-tilt-hint="top" data-tilt-label="${TILT_HINT_LABEL}">
@@ -452,10 +444,6 @@ export class App {
 
   /** Snap reveal state to current tilt when landing on a slide (avoids bleed from the previous photo). */
   private syncSlideOpacityOnNavigate(index: number): void {
-    if (this.slideLocked[index]) {
-      return
-    }
-
     this.numberInRangePrev[index] = false
 
     if (!this.sensorsReady) {
@@ -532,23 +520,6 @@ export class App {
       const carLayer = slide.querySelector('[data-car-layer]') as HTMLElement | null
       const numberLayer = slide.querySelector('[data-number-layer]') as HTMLElement | null
       const hintElements = slide.querySelectorAll<HTMLElement>('[data-tilt-hint]')
-      const gradientElements = slide.querySelectorAll<HTMLElement>('[data-tilt-gradient]')
-
-      if (this.slideLocked[index]) {
-        if (carLayer) {
-          carLayer.style.opacity = '1'
-        }
-        if (numberLayer) {
-          numberLayer.style.opacity = '1'
-        }
-        for (const element of hintElements) {
-          this.applyTiltHintElement(element, { strength: 0, locked: false })
-        }
-        for (const element of gradientElements) {
-          this.applyTiltEdgeGradient(element, { strength: 0, locked: false })
-        }
-        return
-      }
 
       const isActive = index === this.puzzleIndex
       const usesReveal = this.slideUsesRevealOpacity(index)
@@ -601,7 +572,7 @@ export class App {
       }
       if (numberLayer) {
         numberLayer.style.opacity = String(displayNumber)
-        if (puzzle.number && !this.slideLocked[index]) {
+        if (puzzle.number) {
           this.updateNumberRevealFlash(numberLayer, index, displayNumber >= 1)
         }
       }
@@ -615,7 +586,7 @@ export class App {
         )
       }
 
-      if (!this.slideLocked[index] && isActive && this.sensorsReady) {
+      if (isActive && this.sensorsReady) {
         const hintTolerance = hintToleranceForDistance(
           distance,
           puzzle.car.tolerance,
@@ -627,39 +598,10 @@ export class App {
           const sideState: TiltHintSideState = side ? hintState[side] : { strength: 0, locked: false }
           this.applyTiltHintElement(element, sideState)
         }
-        for (const element of gradientElements) {
-          const side = element.dataset.tiltGradient as keyof typeof hintState | undefined
-          const sideState: TiltHintSideState = side ? hintState[side] : { strength: 0, locked: false }
-          this.applyTiltEdgeGradient(element, sideState)
-        }
       } else if (isActive) {
         for (const element of hintElements) {
           this.applyTiltHintElement(element, { strength: 0, locked: false })
         }
-        for (const element of gradientElements) {
-          this.applyTiltEdgeGradient(element, { strength: 0, locked: false })
-        }
-      }
-
-      if (!this.slideLocked[index] && puzzle.number && isDigitFound(displayNumber)) {
-        this.slideLocked[index] = true
-        if (isActive) {
-          this.proximityHaptics.success()
-        }
-        numberLayer?.classList.add('is-locked')
-        if (carLayer) {
-          carLayer.style.opacity = '1'
-        }
-        if (numberLayer) {
-          numberLayer.style.opacity = '1'
-        }
-        for (const element of hintElements) {
-          this.applyTiltHintElement(element, { strength: 0, locked: false })
-        }
-        for (const element of gradientElements) {
-          this.applyTiltEdgeGradient(element, { strength: 0, locked: false })
-        }
-        this.updateGalleryChrome()
       }
     })
   }
@@ -731,17 +673,6 @@ export class App {
     element.style.setProperty('--hint-scale', String(scale))
     element.style.opacity = String(0.45 + 0.55 * state.strength)
     element.classList.toggle('is-active', state.strength > 0.45)
-  }
-
-  private applyTiltEdgeGradient(element: HTMLElement, state: TiltHintSideState): void {
-    if (state.locked || state.strength <= 0) {
-      element.style.opacity = '0'
-      element.classList.remove('is-active')
-      return
-    }
-
-    element.style.opacity = String(0.2 + 0.65 * state.strength)
-    element.classList.toggle('is-active', state.strength > 0.35)
   }
 
   private stopGalleryLoop(): void {
