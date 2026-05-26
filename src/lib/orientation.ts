@@ -247,22 +247,16 @@ export function isAndroidDevice(): boolean {
 
 export type TiltHintSide = keyof TiltHintsState
 
-const TILT_LABELS_IOS: Record<TiltHintSide, string> = {
+const TILT_LABELS: Record<TiltHintSide, string> = {
   top: 'Tilt up',
   bottom: 'Tilt down',
   left: 'Tilt left',
   right: 'Tilt right',
 }
 
-const TILT_LABELS_ANDROID: Record<TiltHintSide, string> = {
-  top: 'Tilt down',
-  bottom: 'Tilt up',
-  left: 'Tilt right',
-  right: 'Tilt left',
-}
-
+/** Label for each screen edge; position never changes (Android only inverts which hint lights up). */
 export function tiltHintLabel(side: TiltHintSide): string {
-  return (isAndroidDevice() ? TILT_LABELS_ANDROID : TILT_LABELS_IOS)[side]
+  return TILT_LABELS[side]
 }
 
 /** Swap edge hints — used when accelerometer tilt axes are inverted vs iOS gyro. */
