@@ -1,5 +1,5 @@
 /** Matches reveal fade tail so haptics begin as the car starts appearing. */
-const FADE_TAIL_RATIO = 1.25
+const FADE_TAIL_RATIO = 1.55
 
 const MIN_PROXIMITY = 0.1
 

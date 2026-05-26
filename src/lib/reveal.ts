@@ -4,7 +4,7 @@ import { angularDistance } from './orientation'
 export const FOUND_OPACITY_THRESHOLD = 0.9
 
 /** How far beyond tolerance opacity eases to zero (avoids hard black snaps). */
-const FADE_TAIL_RATIO = 1.25
+const FADE_TAIL_RATIO = 1.55
 
 export interface DualRevealOpacities {
   car: number
