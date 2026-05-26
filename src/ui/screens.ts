@@ -18,7 +18,7 @@ import { ProximityHaptics } from '../lib/haptics'
 import { releaseWakeLock, requestWakeLock } from '../lib/wakeLock'
 import { attachGallerySwipe } from './gallery'
 
-type Screen = 'intro' | 'gallery' | 'summary' | 'calibrate'
+type Screen = 'grid' | 'gallery' | 'summary' | 'calibrate'
 
 const CALIBRATION_TAP_COUNT = 5
 const CALIBRATION_TAP_WINDOW_MS = 2000
@@ -26,7 +26,8 @@ const CALIBRATION_TAP_WINDOW_MS = 2000
 export class App {
   private root: HTMLElement
   private orientation = new OrientationManager()
-  private screen: Screen = 'intro'
+  private screen: Screen = 'grid'
+  private sensorsReady = false
   private puzzleIndex = 0
   private slideLocked: boolean[] = puzzles.map(() => false)
   private smoothedOpacity: SmoothedLayerOpacity[] = puzzles.map(() => ({ car: 0, number: 0 }))
@@ -39,7 +40,7 @@ export class App {
   private rafId: number | null = null
   private calibrationTapCount = 0
   private calibrationTapTimer: number | null = null
-  private returnScreen: Screen = 'intro'
+  private returnScreen: Screen = 'grid'
   private latestReading: OrientationReading = { beta: null, gamma: null, alpha: null }
   private proximityHaptics = new ProximityHaptics()
 
@@ -71,8 +72,8 @@ export class App {
     this.root.innerHTML = ''
 
     switch (this.screen) {
-      case 'intro':
-        this.renderIntro()
+      case 'grid':
+        this.renderGrid()
         break
       case 'gallery':
         this.renderGallery()
@@ -86,64 +87,67 @@ export class App {
     }
   }
 
-  private renderIntro(): void {
-    const container = this.createScreen('intro-screen')
-    container.innerHTML = `
-      <div class="intro-content">
-        <div class="photos-app-icon" aria-hidden="true"></div>
-        <h1>Photos</h1>
-        <p class="lede">Allow motion access to view your library.</p>
-        ${
-          !this.orientation.isSecureContext
-            ? '<p class="warning">Open via HTTPS or the installed app — not as a local file.</p>'
-            : ''
-        }
-        <button type="button" class="btn btn-photos" data-action="enable-sensors">
-          Continue
+  private renderGrid(): void {
+    void this.releaseWakeLock()
+
+    const container = this.createScreen('album-grid-screen')
+    const cellsHtml = puzzles
+      .map(
+        (puzzle, index) => `
+        <button
+          type="button"
+          class="album-grid-cell"
+          data-action="open-photo"
+          data-photo-index="${index}"
+          aria-label="Open photo ${index + 1}"
+        >
+          <img
+            class="album-grid-image"
+            src="${puzzle.car.image}"
+            alt=""
+            draggable="false"
+            loading="lazy"
+          />
         </button>
-        <p class="hint" data-sensor-status hidden></p>
+      `,
+      )
+      .join('')
+
+    container.innerHTML = `
+      <header class="album-grid-header">
+        <h1 class="album-grid-title">Photos</h1>
+      </header>
+      <div class="album-grid-scroll">
+        <div class="album-grid" data-album-grid>
+          ${cellsHtml}
+        </div>
       </div>
     `
-
-    container.querySelector('[data-action="enable-sensors"]')?.addEventListener('click', () => {
-      void this.enableSensors(container)
-    })
 
     this.attachCalibrationTrigger(container)
     this.root.append(container)
   }
 
-  private async enableSensors(container: HTMLElement): Promise<void> {
-    const button = container.querySelector('[data-action="enable-sensors"]') as HTMLButtonElement | null
-    const status = container.querySelector('[data-sensor-status]') as HTMLElement | null
-
-    if (button) {
-      button.disabled = true
-      button.textContent = 'Loading…'
+  private async ensureSensors(): Promise<boolean> {
+    if (this.sensorsReady) {
+      return true
     }
 
     const granted = await this.orientation.requestAccess()
-
     if (!granted) {
-      if (button) {
-        button.disabled = false
-        button.textContent = 'Continue'
-      }
-      if (status) {
-        status.hidden = false
-        status.textContent =
-          'Motion access unavailable. Install via HTTPS or the APK, then try again.'
-      }
-      return
+      return false
     }
 
     this.orientation.start((reading) => {
       this.latestReading = reading
     })
+    this.sensorsReady = true
+    return true
+  }
 
-    this.puzzleIndex = 0
-    this.slideLocked = puzzles.map(() => false)
-    this.smoothedOpacity = puzzles.map(() => ({ car: 0, number: 0 }))
+  private async openPhoto(index: number): Promise<void> {
+    await this.ensureSensors()
+    this.puzzleIndex = index
     this.setScreen('gallery')
     void this.acquireWakeLock()
   }
@@ -194,7 +198,7 @@ export class App {
 
     container.innerHTML = `
       <header class="photos-toolbar">
-        <button type="button" class="photos-toolbar-btn" data-action="albums" aria-label="Albums">
+        <button type="button" class="photos-toolbar-btn" data-action="back-to-grid" aria-label="Back to album">
           <span class="photos-toolbar-chevron" aria-hidden="true">‹</span>
           <span>Albums</span>
         </button>
@@ -516,7 +520,7 @@ export class App {
         this.calibrationTapCount = 0
         this.stopGalleryLoop()
         void this.releaseWakeLock()
-        this.returnScreen = this.screen === 'gallery' ? 'gallery' : this.screen
+        this.returnScreen = this.screen
         this.setScreen('calibrate')
       }
     })
@@ -549,17 +553,27 @@ export class App {
       const actionTarget = target.closest<HTMLElement>('[data-action]')
       const action = actionTarget?.dataset.action
 
+      if (action === 'open-photo') {
+        const index = Number(actionTarget?.dataset.photoIndex)
+        if (!Number.isNaN(index)) {
+          void this.openPhoto(index)
+        }
+        return
+      }
+
+      if (action === 'back-to-grid') {
+        this.setScreen('grid')
+        return
+      }
+
       if (action === 'view-code') {
         this.setScreen('summary')
+        return
       }
 
       if (action === 'close-summary') {
         this.setScreen('gallery')
         void this.acquireWakeLock()
-      }
-
-      if (action === 'albums') {
-        // Decorative — stays in gallery
       }
     })
   }
