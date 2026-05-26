@@ -8,7 +8,7 @@ export default defineConfig({
   plugins: [
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'assets/cars/**/*'],
+      includeAssets: ['favicon.svg', 'assets/cars/**/*', 'assets/cars/thumbs/**/*'],
       manifest: {
         name: 'Photos',
         short_name: 'Photos',

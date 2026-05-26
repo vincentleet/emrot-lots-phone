@@ -231,6 +231,21 @@ export interface TiltHints {
   left: number
 }
 
+/** True for Android phones/tablets (accel fallback uses inverted tilt axes). */
+export function isAndroidDevice(): boolean {
+  return /android/i.test(navigator.userAgent)
+}
+
+/** Swap edge hints — used when accelerometer tilt axes are inverted vs iOS gyro. */
+export function invertTiltHints(hints: TiltHints): TiltHints {
+  return {
+    top: hints.bottom,
+    bottom: hints.top,
+    left: hints.right,
+    right: hints.left,
+  }
+}
+
 const MIN_HINT_DELTA_DEG = 2
 
 function hintIntensity(delta: number, tolerance: number): number {

@@ -1,7 +1,10 @@
 import { puzzles } from '../config/puzzles'
+import { albumThumbUrl } from '../lib/assets'
 import type { OrientationReading } from '../config/types'
 import {
   computeTiltHints,
+  invertTiltHints,
+  isAndroidDevice,
   formatOrientation,
   formatTarget,
   OrientationManager,
@@ -49,6 +52,7 @@ export class App {
   constructor(root: HTMLElement) {
     this.root = root
     this.render()
+    this.warmAlbumCache()
   }
 
   private setScreen(screen: Screen): void {
@@ -96,11 +100,13 @@ export class App {
         >
           <img
             class="album-grid-image"
-            src="${puzzle.car.image}"
+            src="${albumThumbUrl(puzzle.car.image)}"
+            data-full-src="${puzzle.car.image}"
             alt=""
             draggable="false"
             loading="eager"
             decoding="async"
+            fetchpriority="${index < 4 ? 'high' : 'auto'}"
           />
         </button>
       `,
@@ -119,7 +125,29 @@ export class App {
     `
 
     this.attachCalibrationTrigger(container)
+    this.attachAlbumThumbFallback(container)
     this.root.append(container)
+    this.warmAlbumCache()
+  }
+
+  private warmAlbumCache(): void {
+    for (const puzzle of puzzles) {
+      void this.preloadImage(albumThumbUrl(puzzle.car.image), 30_000)
+      void this.preloadImage(puzzle.car.image, 30_000)
+    }
+  }
+
+  private attachAlbumThumbFallback(container: HTMLElement): void {
+    for (const img of container.querySelectorAll<HTMLImageElement>('.album-grid-image')) {
+      img.addEventListener('error', () => {
+        const full = img.dataset.fullSrc
+        if (!full || img.src.endsWith(full)) {
+          return
+        }
+        img.removeAttribute('fetchpriority')
+        img.src = full
+      }, { once: true })
+    }
   }
 
   private preloadImage(src: string, timeoutMs = 1200): Promise<void> {
@@ -447,7 +475,10 @@ export class App {
             puzzle.car.tolerance,
             puzzle.number?.tolerance,
           )
-          const hints = computeTiltHints(this.latestReading, puzzle.target, hintTolerance)
+          let hints = computeTiltHints(this.latestReading, puzzle.target, hintTolerance)
+          if (isAndroidDevice()) {
+            hints = invertTiltHints(hints)
+          }
           for (const element of hintElements) {
             const side = element.dataset.tiltHint as keyof typeof hints | undefined
             const strength = side ? hints[side] : 0
