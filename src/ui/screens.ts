@@ -4,7 +4,7 @@ import type { OrientationReading } from '../config/types'
 import {
   computeTiltHintState,
   invertTiltHintStateVertical,
-  isAndroidDevice,
+  shouldSwapVerticalTiltHints,
   TILT_HINT_LABEL,
   type TiltHintSideState,
   formatOrientation,
@@ -441,7 +441,7 @@ export class App {
           puzzle.number?.tolerance,
         )
         let hintState = computeTiltHintState(this.latestReading, puzzle.target, hintTolerance)
-        if (isAndroidDevice()) {
+        if (shouldSwapVerticalTiltHints(this.orientation.sensorSource)) {
           hintState = invertTiltHintStateVertical(hintState)
         }
         for (const element of hintElements) {
@@ -501,7 +501,7 @@ export class App {
       if (label) {
         label.textContent = '✓'
       }
-      element.style.setProperty('--hint-scale', '0.88')
+      element.style.setProperty('--hint-scale', '0.72')
       element.style.opacity = '1'
       element.classList.add('is-axis-locked')
       element.classList.remove('is-active')
@@ -520,7 +520,7 @@ export class App {
       return
     }
 
-    const scale = 0.55 + 0.45 * state.strength
+    const scale = 0.4 + 0.35 * state.strength
     element.style.setProperty('--hint-scale', String(scale))
     element.style.opacity = String(0.3 + 0.7 * state.strength)
     element.classList.toggle('is-active', state.strength > 0.55)
@@ -682,6 +682,7 @@ export class App {
 
       if (action === 'back-to-grid') {
         this.setScreen('grid')
+        return
       }
     })
   }

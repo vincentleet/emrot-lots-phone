@@ -247,7 +247,7 @@ export function isAndroidDevice(): boolean {
 
 export const TILT_HINT_LABEL = 'Tilt'
 
-/** Swap top/bottom hint strength on Android (accel axes differ from iOS gyro). */
+/** Swap top/bottom hint strength (accel axes differ from iOS gyro). */
 export function invertTiltHintStateVertical(state: TiltHintsState): TiltHintsState {
   const betaLocked = state.top.locked || state.bottom.locked
   return {
@@ -255,6 +255,11 @@ export function invertTiltHintStateVertical(state: TiltHintsState): TiltHintsSta
     top: { strength: state.bottom.strength, locked: betaLocked },
     bottom: { strength: state.top.strength, locked: betaLocked },
   }
+}
+
+/** Android tablets use devicemotion; top/bottom hints must be swapped. */
+export function shouldSwapVerticalTiltHints(sensorSource: SensorSource | null): boolean {
+  return isAndroidDevice() || sensorSource === 'motion'
 }
 
 const MIN_HINT_DELTA_DEG = 2

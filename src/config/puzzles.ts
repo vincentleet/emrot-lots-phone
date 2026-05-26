@@ -4,6 +4,9 @@ import type { Puzzle } from './types'
 
 type PuzzleDraft = Omit<Puzzle, 'id'>
 
+const CAR_TOLERANCE = 36
+const NUMBER_TOLERANCE = 8
+
 /**
  * Key = car number from filename (car1.png → 1).
  * Album order is always car1, car2, car3, … by file number.
@@ -13,14 +16,14 @@ const puzzleByCarNumber: Record<number, PuzzleDraft> = {
     target: { beta: 52, gamma: 0 },
     car: {
       image: assetUrl('assets/cars/car1.png'),
-      tolerance: 50,
+      tolerance: CAR_TOLERANCE,
     },
   },
   2: {
     target: { beta: 50, gamma: 28 },
     car: {
       image: assetUrl('assets/cars/car2.png'),
-      tolerance: 50,
+      tolerance: CAR_TOLERANCE,
     },
   },
   3: {
@@ -28,25 +31,25 @@ const puzzleByCarNumber: Record<number, PuzzleDraft> = {
     target: { beta: 46, gamma: 62 },
     car: {
       image: assetUrl('assets/cars/car3.png'),
-      tolerance: 50,
+      tolerance: CAR_TOLERANCE,
     },
     number: {
       image: assetUrl('assets/cars/car3-number.png'),
-      tolerance: 10,
+      tolerance: NUMBER_TOLERANCE,
     },
   },
   4: {
     target: { beta: 54, gamma: -24 },
     car: {
       image: assetUrl('assets/cars/car4.png'),
-      tolerance: 50,
+      tolerance: CAR_TOLERANCE,
     },
   },
   5: {
     target: { beta: 50, gamma: 0 },
     car: {
       image: assetUrl('assets/cars/car5.png'),
-      tolerance: 50,
+      tolerance: CAR_TOLERANCE,
     },
   },
   6: {
@@ -54,18 +57,18 @@ const puzzleByCarNumber: Record<number, PuzzleDraft> = {
     target: { beta: 44, gamma: -52 },
     car: {
       image: assetUrl('assets/cars/car6.png'),
-      tolerance: 50,
+      tolerance: CAR_TOLERANCE,
     },
     number: {
       image: assetUrl('assets/cars/car6-number.png'),
-      tolerance: 10,
+      tolerance: NUMBER_TOLERANCE,
     },
   },
   7: {
     target: { beta: 48, gamma: 18 },
     car: {
       image: assetUrl('assets/cars/car7.png'),
-      tolerance: 50,
+      tolerance: CAR_TOLERANCE,
     },
   },
   8: {
@@ -74,11 +77,11 @@ const puzzleByCarNumber: Record<number, PuzzleDraft> = {
     target: { beta: 82, gamma: 0 },
     car: {
       image: assetUrl('assets/cars/car8.png'),
-      tolerance: 50,
+      tolerance: CAR_TOLERANCE,
     },
     number: {
       image: assetUrl('assets/cars/car8-number.png'),
-      tolerance: 10,
+      tolerance: NUMBER_TOLERANCE,
     },
   },
 }
