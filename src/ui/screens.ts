@@ -128,6 +128,14 @@ export class App {
     this.root.append(container)
   }
 
+  private attachBackToGrid(container: HTMLElement): void {
+    container.querySelector('[data-action="back-to-grid"]')?.addEventListener('click', (event) => {
+      event.preventDefault()
+      event.stopPropagation()
+      this.setScreen('grid')
+    })
+  }
+
   private async ensureSensors(): Promise<boolean> {
     if (this.sensorsReady) {
       return true
@@ -198,11 +206,13 @@ export class App {
 
     container.innerHTML = `
       <header class="photos-toolbar">
-        <button type="button" class="photos-toolbar-btn" data-action="back-to-grid" aria-label="Back to album">
-          <span class="photos-toolbar-chevron" aria-hidden="true">‹</span>
-          <span>Albums</span>
+        <button type="button" class="photos-toolbar-btn photos-toolbar-btn--back" data-action="back-to-grid" aria-label="Back to album">
+          <svg class="photos-toolbar-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
+          </svg>
+          <span>Album</span>
         </button>
-        <span class="photos-toolbar-title" data-photo-counter>${this.puzzleIndex + 1} of ${puzzles.length}</span>
+        <span class="photos-toolbar-title" data-photo-counter>${this.puzzleIndex + 1} / ${puzzles.length}</span>
         <button
           type="button"
           class="photos-toolbar-btn photos-toolbar-btn--icon"
@@ -210,7 +220,9 @@ export class App {
           aria-label="View recovered code"
           ${this.allCodeSlidesLocked() ? '' : 'hidden'}
         >
-          <span aria-hidden="true">ⓘ</span>
+          <svg class="photos-toolbar-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
+          </svg>
         </button>
       </header>
       <div class="photos-viewport" data-gallery-viewport>
@@ -240,6 +252,7 @@ export class App {
     }
 
     this.attachCalibrationTrigger(container)
+    this.attachBackToGrid(container)
     this.root.append(container)
     this.updateGalleryTransform(false)
     this.startGalleryLoop(container)
@@ -280,7 +293,7 @@ export class App {
 
     const counter = this.galleryContainer.querySelector('[data-photo-counter]')
     if (counter) {
-      counter.textContent = `${this.puzzleIndex + 1} of ${puzzles.length}`
+      counter.textContent = `${this.puzzleIndex + 1} / ${puzzles.length}`
     }
 
     const codeButton = this.galleryContainer.querySelector('[data-action="view-code"]') as HTMLElement | null
