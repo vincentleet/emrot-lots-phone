@@ -3,8 +3,9 @@ import { albumThumbUrl } from '../lib/assets'
 import type { OrientationReading } from '../config/types'
 import {
   computeTiltHintState,
-  invertTiltHintStateVertical,
-  shouldSwapVerticalTiltHints,
+  remapTiltReading,
+  remapTiltTarget,
+  shouldRemapTiltAxes,
   TILT_HINT_LABEL,
   type TiltHintSideState,
   formatOrientation,
@@ -398,9 +399,13 @@ export class App {
         return
       }
 
+      const remapAxes = shouldRemapTiltAxes(this.orientation.sensorSource)
+      const reading = remapAxes ? remapTiltReading(this.latestReading) : this.latestReading
+      const target = remapAxes ? remapTiltTarget(puzzle.target) : puzzle.target
+
       const { car, number, distance } = computeDualRevealOpacity(
-        this.latestReading,
-        puzzle.target,
+        reading,
+        target,
         puzzle.car.tolerance,
         puzzle.number?.tolerance,
       )
@@ -440,10 +445,7 @@ export class App {
           puzzle.car.tolerance,
           puzzle.number?.tolerance,
         )
-        let hintState = computeTiltHintState(this.latestReading, puzzle.target, hintTolerance)
-        if (shouldSwapVerticalTiltHints(this.orientation.sensorSource)) {
-          hintState = invertTiltHintStateVertical(hintState)
-        }
+        const hintState = computeTiltHintState(reading, target, hintTolerance)
         for (const element of hintElements) {
           const side = element.dataset.tiltHint as keyof typeof hintState | undefined
           const sideState: TiltHintSideState = side ? hintState[side] : { strength: 0, locked: false }

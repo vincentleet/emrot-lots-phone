@@ -247,19 +247,28 @@ export function isAndroidDevice(): boolean {
 
 export const TILT_HINT_LABEL = 'Tilt'
 
-/** Swap top/bottom hint strength (accel axes differ from iOS gyro). */
-export function invertTiltHintStateVertical(state: TiltHintsState): TiltHintsState {
-  const betaLocked = state.top.locked || state.bottom.locked
+/** Android accel: pitch/roll map to gamma/beta vs iOS gyro — swap axes for hints + reveal. */
+export function shouldRemapTiltAxes(sensorSource: SensorSource | null): boolean {
+  return isAndroidDevice() || sensorSource === 'motion'
+}
+
+export function remapTiltReading(reading: OrientationReading): OrientationReading {
+  if (reading.beta === null || reading.gamma === null) {
+    return reading
+  }
+
   return {
-    ...state,
-    top: { strength: state.bottom.strength, locked: betaLocked },
-    bottom: { strength: state.top.strength, locked: betaLocked },
+    beta: reading.gamma,
+    gamma: reading.beta,
+    alpha: reading.alpha,
   }
 }
 
-/** Android tablets use devicemotion; top/bottom hints must be swapped. */
-export function shouldSwapVerticalTiltHints(sensorSource: SensorSource | null): boolean {
-  return isAndroidDevice() || sensorSource === 'motion'
+export function remapTiltTarget(target: OrientationTarget): OrientationTarget {
+  return {
+    beta: target.gamma,
+    gamma: target.beta,
+  }
 }
 
 const MIN_HINT_DELTA_DEG = 2
