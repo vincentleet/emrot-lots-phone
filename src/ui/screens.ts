@@ -312,6 +312,26 @@ export class App {
 
     const tick = () => {
       slides.forEach((slide, index) => {
+        // If sensors never became ready (e.g. Android with motion sensors disabled),
+        // fall back to showing static photos instead of a black screen.
+        if (!this.sensorsReady) {
+          const carLayer = slide.querySelector('[data-car-layer]') as HTMLElement | null
+          const numberLayer = slide.querySelector('[data-number-layer]') as HTMLElement | null
+          const hintElements = slide.querySelectorAll<HTMLElement>('[data-tilt-hint]')
+
+          if (carLayer) {
+            carLayer.style.opacity = '1'
+          }
+          if (numberLayer && !this.slideLocked[index]) {
+            numberLayer.style.opacity = '0'
+          }
+          for (const element of hintElements) {
+            element.style.opacity = '0'
+            element.classList.remove('is-active')
+          }
+          return
+        }
+
         const puzzle = puzzles[index]
         const carLayer = slide.querySelector('[data-car-layer]') as HTMLElement | null
         const numberLayer = slide.querySelector('[data-number-layer]') as HTMLElement | null
