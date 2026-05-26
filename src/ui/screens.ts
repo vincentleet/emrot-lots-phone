@@ -28,6 +28,7 @@ export class App {
   private orientation = new OrientationManager()
   private screen: Screen = 'grid'
   private sensorsReady = false
+  private sensorsRequestInFlight = false
   private puzzleIndex = 0
   private slideLocked: boolean[] = puzzles.map(() => false)
   private smoothedOpacity: SmoothedLayerOpacity[] = puzzles.map(() => ({ car: 0, number: 0 }))
@@ -43,6 +44,7 @@ export class App {
   private returnScreen: Screen = 'grid'
   private latestReading: OrientationReading = { beta: null, gamma: null, alpha: null }
   private proximityHaptics = new ProximityHaptics()
+  private preloadCache = new Map<string, Promise<void>>()
 
   constructor(root: HTMLElement) {
     this.root = root
@@ -106,7 +108,8 @@ export class App {
             src="${puzzle.car.image}"
             alt=""
             draggable="false"
-            loading="lazy"
+            loading="eager"
+            decoding="async"
           />
         </button>
       `,
@@ -128,6 +131,36 @@ export class App {
     this.root.append(container)
   }
 
+  private preloadImage(src: string, timeoutMs = 1200): Promise<void> {
+    const existing = this.preloadCache.get(src)
+    if (existing) {
+      return existing
+    }
+
+    const promise = new Promise<void>((resolve) => {
+      const img = new Image()
+      const timer = window.setTimeout(() => resolve(), timeoutMs)
+
+      const done = () => {
+        window.clearTimeout(timer)
+        resolve()
+      }
+
+      img.onload = () => {
+        // decode() helps Android avoid a visible blank before first paint.
+        void img.decode?.().then(done).catch(done)
+        if (!img.decode) {
+          done()
+        }
+      }
+      img.onerror = done
+      img.src = src
+    })
+
+    this.preloadCache.set(src, promise)
+    return promise
+  }
+
   private attachBackToGrid(container: HTMLElement): void {
     container.querySelector('[data-action="back-to-grid"]')?.addEventListener('click', (event) => {
       event.preventDefault()
@@ -140,9 +173,14 @@ export class App {
     if (this.sensorsReady) {
       return true
     }
+    if (this.sensorsRequestInFlight) {
+      return false
+    }
+    this.sensorsRequestInFlight = true
 
     const granted = await this.orientation.requestAccess()
     if (!granted) {
+      this.sensorsRequestInFlight = false
       return false
     }
 
@@ -150,14 +188,25 @@ export class App {
       this.latestReading = reading
     })
     this.sensorsReady = true
+    this.sensorsRequestInFlight = false
     return true
   }
 
   private async openPhoto(index: number): Promise<void> {
-    await this.ensureSensors()
+    // Pre-decode the tapped photo (Android often delays first paint otherwise).
+    const puzzle = puzzles[index]
+    void this.preloadImage(puzzle.car.image)
+    if (puzzle.number) {
+      void this.preloadImage(puzzle.number.image)
+    }
+
     this.puzzleIndex = index
     this.setScreen('gallery')
     void this.acquireWakeLock()
+
+    // Request sensors after navigation so Android doesn't "hang" on the grid.
+    // Still triggered from the tap handler (user gesture) but we don't block UI.
+    void this.ensureSensors()
   }
 
   private renderGallery(): void {
@@ -213,6 +262,7 @@ export class App {
           <span>Album</span>
         </button>
         <span class="photos-toolbar-title" data-photo-counter>${this.puzzleIndex + 1} / ${puzzles.length}</span>
+        <span class="sensor-badge" data-sensor-badge aria-live="polite">Sensors: …</span>
         <button
           type="button"
           class="photos-toolbar-btn photos-toolbar-btn--icon"
@@ -296,6 +346,24 @@ export class App {
       counter.textContent = `${this.puzzleIndex + 1} / ${puzzles.length}`
     }
 
+    const badge = this.galleryContainer.querySelector('[data-sensor-badge]') as HTMLElement | null
+    if (badge) {
+      const isSecure = this.orientation.isSecureContext
+      const lastEvent = this.orientation.lastEventName ?? 'none'
+      const ageMs = this.orientation.lastReadingAtMs === null ? null : Date.now() - this.orientation.lastReadingAtMs
+      const ageText = ageMs === null ? 'never' : `${Math.round(ageMs / 100) / 10}s`
+      const beta = this.latestReading.beta
+      const gamma = this.latestReading.gamma
+      const hasAngles = beta !== null || gamma !== null
+      const anglesText = hasAngles
+        ? `β${beta === null ? '—' : Math.round(beta)} γ${gamma === null ? '—' : Math.round(gamma)}`
+        : 'β— γ—'
+
+      const sensorState = this.sensorsReady ? 'on' : this.sensorsRequestInFlight ? 'requesting' : 'off'
+      badge.textContent = `Sensors: ${sensorState} · ${isSecure ? 'https' : 'not-https'} · ${String(lastEvent)} · ${ageText} · ${anglesText}`
+      badge.dataset.state = this.sensorsReady && hasAngles ? 'ok' : 'bad'
+    }
+
     const codeButton = this.galleryContainer.querySelector('[data-action="view-code"]') as HTMLElement | null
     if (codeButton) {
       codeButton.hidden = !this.allCodeSlidesLocked()
@@ -311,6 +379,7 @@ export class App {
     const slides = container.querySelectorAll<HTMLElement>('[data-slide]')
 
     const tick = () => {
+      this.updateGalleryChrome()
       slides.forEach((slide, index) => {
         // If sensors never became ready (e.g. Android with motion sensors disabled),
         // fall back to showing static photos instead of a black screen.

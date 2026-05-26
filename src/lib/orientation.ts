@@ -6,18 +6,25 @@ interface DeviceOrientationEventConstructorWithPermission {
   requestPermission?: () => Promise<'granted' | 'denied'>
 }
 
+const ORIENTATION_EVENTS = ['deviceorientation', 'deviceorientationabsolute'] as const
+type OrientationEventName = (typeof ORIENTATION_EVENTS)[number]
 export class OrientationManager {
   private listener: OrientationListener | null = null
-  private boundHandler = (event: DeviceOrientationEvent) => {
-    this.listener?.({
-      beta: event.beta,
-      gamma: event.gamma,
-      alpha: event.alpha,
-    })
-  }
+  private lastEvent: OrientationEventName | null = null
+  private lastReadingMs: number | null = null
+  private handlers: Partial<Record<OrientationEventName, (event: DeviceOrientationEvent) => void>> =
+    {}
 
   get isSecureContext(): boolean {
     return window.isSecureContext
+  }
+
+  get lastEventName(): OrientationEventName | null {
+    return this.lastEvent
+  }
+
+  get lastReadingAtMs(): number | null {
+    return this.lastReadingMs
   }
 
   async requestAccess(): Promise<boolean> {
@@ -30,17 +37,35 @@ export class OrientationManager {
       }
     }
 
-    return this.waitForFirstReading(3000)
+    return this.waitForFirstReading(5000)
   }
 
   start(listener: OrientationListener): void {
     this.listener = listener
-    window.addEventListener('deviceorientation', this.boundHandler)
+    for (const eventName of ORIENTATION_EVENTS) {
+      const handler = (event: DeviceOrientationEvent) => {
+        this.lastEvent = eventName
+        this.lastReadingMs = Date.now()
+        this.listener?.({
+          beta: event.beta,
+          gamma: event.gamma,
+          alpha: event.alpha,
+        })
+      }
+      this.handlers[eventName] = handler
+      window.addEventListener(eventName, handler as EventListener)
+    }
   }
 
   stop(): void {
-    window.removeEventListener('deviceorientation', this.boundHandler)
+    for (const eventName of ORIENTATION_EVENTS) {
+      const handler = this.handlers[eventName]
+      if (handler) {
+        window.removeEventListener(eventName, handler as EventListener)
+      }
+    }
     this.listener = null
+    this.handlers = {}
   }
 
   private waitForFirstReading(timeoutMs: number): Promise<boolean> {
@@ -48,14 +73,18 @@ export class OrientationManager {
       let resolved = false
 
       const handler = (event: DeviceOrientationEvent) => {
-        if (event.beta === null && event.gamma === null) {
+        // Some Android/Chrome variants only populate certain fields and/or only
+        // emit on `deviceorientationabsolute`.
+        if (event.beta === null && event.gamma === null && event.alpha === null) {
           return
         }
         if (resolved) {
           return
         }
         resolved = true
-        window.removeEventListener('deviceorientation', handler)
+        for (const eventName of ORIENTATION_EVENTS) {
+          window.removeEventListener(eventName, handler as EventListener)
+        }
         clearTimeout(timer)
         resolve(true)
       }
@@ -65,11 +94,15 @@ export class OrientationManager {
           return
         }
         resolved = true
-        window.removeEventListener('deviceorientation', handler)
+        for (const eventName of ORIENTATION_EVENTS) {
+          window.removeEventListener(eventName, handler as EventListener)
+        }
         resolve(false)
       }, timeoutMs)
 
-      window.addEventListener('deviceorientation', handler)
+      for (const eventName of ORIENTATION_EVENTS) {
+        window.addEventListener(eventName, handler as EventListener)
+      }
     })
   }
 }
