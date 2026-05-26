@@ -322,11 +322,19 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .sensor-badge[data-state='ok'] {
   border-color: rgba(168, 199, 250, 0.35);
   color: var(--md-sys-color-primary);
+}
+
+.sensor-badge[data-state='pending'] {
+  border-color: rgba(255, 255, 255, 0.22);
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .sensor-badge[data-state='bad'] {

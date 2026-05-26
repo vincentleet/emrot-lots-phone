@@ -169,6 +169,19 @@ export class App {
     })
   }
 
+  private attachSensorRetry(container: HTMLElement): void {
+    const badge = container.querySelector('[data-sensor-badge]') as HTMLElement | null
+    if (!badge) {
+      return
+    }
+
+    badge.addEventListener('click', (event) => {
+      event.preventDefault()
+      event.stopPropagation()
+      void this.ensureSensors()
+    })
+  }
+
   private async ensureSensors(): Promise<boolean> {
     if (this.sensorsReady) {
       return true
@@ -303,6 +316,7 @@ export class App {
 
     this.attachCalibrationTrigger(container)
     this.attachBackToGrid(container)
+    this.attachSensorRetry(container)
     this.root.append(container)
     this.updateGalleryTransform(false)
     this.startGalleryLoop(container)
@@ -360,8 +374,9 @@ export class App {
         : 'β— γ—'
 
       const sensorState = this.sensorsReady ? 'on' : this.sensorsRequestInFlight ? 'requesting' : 'off'
-      badge.textContent = `Sensors: ${sensorState} · ${isSecure ? 'https' : 'not-https'} · ${String(lastEvent)} · ${ageText} · ${anglesText}`
-      badge.dataset.state = this.sensorsReady && hasAngles ? 'ok' : 'bad'
+      const hint = sensorState === 'off' ? 'tap to retry' : ''
+      badge.textContent = `Sensors: ${sensorState} · ${isSecure ? 'https' : 'not-https'} · ${String(lastEvent)} · ${ageText} · ${anglesText}${hint ? ` · ${hint}` : ''}`
+      badge.dataset.state = this.sensorsReady && hasAngles ? 'ok' : sensorState === 'requesting' ? 'pending' : 'bad'
     }
 
     const codeButton = this.galleryContainer.querySelector('[data-action="view-code"]') as HTMLElement | null
